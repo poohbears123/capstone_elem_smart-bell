@@ -1,0 +1,940 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FCU Smart Bell - Dashboard</title>
+  <style>
+    :root{--maroon:#800000;--bg:#f4f4f4;--card:#fff;--text:#111;--muted:#666;--danger:#b00020;--ok:#0b7a0b;}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{background:var(--maroon);color:#fff;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    header .brand{font-weight:800}
+    header .right{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+    header button{background:#fff;color:var(--maroon);border:0;border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer}
+
+    .wrap{max-width:980px;margin:18px auto;padding:0 12px 28px}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px}
+    @media(min-width:900px){.grid{grid-template-columns:1.1fr 0.9fr}}
+
+    .card{background:var(--card);border-radius:14px;box-shadow:0 4px 10px rgba(0,0,0,0.06);padding:16px}
+    h3{margin:0 0 10px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+    label{font-size:12px;color:var(--muted);font-weight:700;display:block;margin:10px 0 6px}
+    input,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:14px}
+
+    .btn{background:var(--maroon);color:#fff;border:0;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer}
+    .btn.secondary{background:#eee;color:#222;border:1px solid #ddd}
+    .btn.danger{background:var(--danger)}
+
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{border-bottom:1px solid #eee;padding:9px 6px;text-align:left;font-size:14px}
+    th{color:#444}
+    .pill{display:inline-block;padding:5px 10px;border-radius:999px;font-weight:900;font-size:12px;background:#f1f1f1}
+    .pill.admin{background:#ffecec;color:#800000}
+    .pill.staff{background:#e9f3ff;color:#0b4a87}
+
+    .muted{color:var(--muted)}
+    .status{font-weight:800}
+    textarea{width:100%;min-height:180px;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+
+    .hidden{display:none}
+    .small{font-size:12px;color:var(--muted);line-height:1.35}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">FCU Smart Bell Dashboard</div>
+    <div class="right">
+    <span id="rolePill" class="pill">Role: ...</span>
+
+      <button class="secondary" onclick="location.href='/logout'">Logout</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="grid">
+      <div class="card">
+        <h3>Telemetry</h3>
+        <div class="row" style="justify-content:space-between">
+          <div>
+            <div class="muted">Device Time</div>
+            <div id="time" class="status">...</div>
+          </div>
+          <div>
+            <div class="muted">Bell Status</div>
+            <div id="status" class="status">...</div>
+          </div>
+          <div>
+            <div class="muted">Current SSID</div>
+            <div id="ssid" class="status">...</div>
+          </div>
+        </div>
+
+        <div style="margin-top:14px" class="row">
+          <button class="btn" id="ringBtn">Ring Bell (3s)</button>
+          <span id="ringMsg" class="small"></span>
+        </div>
+
+        <div id="adminOnly" class="hidden">
+          <hr style="border:0;border-top:1px solid #eee;margin:16px 0" />
+          <h3>Admin Tools</h3>
+
+              <div class="card" style="padding:0;box-shadow:none;border:0">
+            <div style="padding:16px 0">
+              <h4 style="margin:0 0 10px">Schedules</h4>
+
+              <div class="row">
+                  <div style="flex:1;min-width:190px">
+                  <label>Schedule Time</label>
+                  <div class="small" style="margin-top:0">Tap “Add Schedule” to set time using analog dials (AM/PM).</div>
+                </div>
+
+                <div style="flex:0;align-self:flex-end;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end">
+                  <button class="btn" style="margin-top:18px" onclick="openAddScheduleModal()">Add Schedule</button>
+                </div>
+              </div>
+
+              <div class="small" style="margin-top:8px">Stored values are reloaded on boot from `/schedule.txt` (on SD).</div>
+
+              <div class="row" style="margin-top:12px;justify-content:space-between">
+                <div class="muted">Existing schedules</div>
+                <button class="btn secondary" onclick="refreshSchedules()">Refresh</button>
+              </div>
+
+              <div style="overflow:auto;max-height:260px">
+                <table>
+                  <thead>
+                    <tr><th style="width:56px">#</th><th>Time</th><th style="width:190px">Action</th></tr>
+                  </thead>
+                  <tbody id="schedBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+
+            <hr style="border:0;border-top:1px solid #eee" />
+
+
+            <div style="padding:16px 0">
+              <h4 style="margin:0 0 10px">Network Settings</h4>
+              <div class="row">
+                <div style="flex:1;min-width:200px">
+                  <label for="ap_name">AP SSID</label>
+                  <input id="ap_name" type="text" placeholder="e.g., FCU_Secure_Bell" />
+                </div>
+                <div style="flex:1;min-width:200px">
+                  <label for="station_ssid">Station SSID</label>
+                  <input id="station_ssid" type="text" placeholder="e.g., MyWiFi" />
+                </div>
+              </div>
+              <label for="station_pass">Station Password</label>
+              <input id="station_pass" type="password" placeholder="WiFi password" />
+              <div class="row" style="margin-top:10px">
+                <button class="btn" onclick="saveNetwork()">Save & Sync Time</button>
+                <span id="netMsg" class="small"></span>
+              </div>
+              <div class="small" style="margin-top:8px">This updates `/config.txt` on the SD card.</div>
+            </div>
+
+            <hr style="border:0;border-top:1px solid #eee" />
+
+            <div style="padding:16px 0">
+              <h4 style="margin:0 0 10px">Security Logs (SuperAdmin)</h4>
+
+              <div class="row" style="justify-content:space-between">
+                <button class="btn secondary" onclick="refreshLogs()">Download Logs</button>
+                <span class="small muted">Upload/Download</span>
+              </div>
+
+              <div class="row" style="margin-top:10px;gap:10px">
+                <button class="btn" onclick="triggerUploadLog()">Upload Logs</button>
+              </div>
+
+              <input id="logUploadFile" type="file" accept="text/plain" style="margin-top:10px" />
+              <textarea id="logs" readonly style="margin-top:10px"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Quick Info</h3>
+        <div class="small">
+          If you get redirected back to the login page, your session may have expired.
+          <br/><br/>
+          Tip: For best results, keep the SD card files in these paths:
+          <br/>
+          <b>/ui/login.html</b> and <b>/ui/dashboard.html</b>
+          <br/><br/>
+          Logs will be displayed here after being written by the firmware.
+        </div>
+
+        <div style="margin-top:16px" class="small">
+          <b>API endpoints used:</b>
+          <ul>
+            <li>/api/telemetry</li>
+            <li>/ring</li>
+            <li>/api/schedules</li>
+            <li>/addSchedule</li>
+            <li>/deleteSchedule</li>
+
+            <li>/backend/logs (SuperAdmin only)</li>
+            <li>/saveNetwork</li>
+
+
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Schedule Modal (Add/Edit) -->
+  <div id="schedModal" style="display:none;position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.35);align-items:center;justify-content:center;padding:18px;z-index:10000;">
+    <div style="background:#fff;border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,0.25);width:min(620px,92vw);padding:18px 18px 14px;border-top:8px solid #800000;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div>
+          <h3 id="schedModalTitle" style="margin:0;">Schedule Time</h3>
+          <div id="schedPreview" class="small muted" style="margin-top:4px;">Selected: 00:00 (AM)</div>
+        </div>
+        <button type="button" class="btn secondary" style="padding:8px 12px;" onclick="hideScheduleModal()">Close</button>
+      </div>
+
+      <div style="margin-top:12px;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;">
+        <div id="schedDialHost" style="flex:1;min-width:260px;"></div>
+
+        <div style="flex:0;min-width:160px;">
+          <div class="small" style="font-weight:900;color:#333;margin-bottom:8px;">AM / PM</div>
+          <div id="ampmWrap" style="display:flex;gap:10px;flex-wrap:wrap;">
+            <!-- injected by JS -->
+          </div>
+
+          <div class="small muted" style="margin-top:12px;">Scroll spinners to choose time.</div>
+        </div>
+      </div>
+
+      <div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" class="btn secondary" onclick="hideScheduleModal()" style="background:#eee;">Cancel</button>
+        <button type="button" class="btn" onclick="confirmScheduleModalSave()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .ampmBtn{border:1px solid #ddd;background:#f7f7f7;border-radius:12px;padding:10px 16px;font-weight:900;cursor:pointer;color:#222;}
+    .ampmBtn.active{background:#800000;color:#fff;border-color:#800000;}
+  </style>
+
+  <script>
+    const adminOnlyEl = document.getElementById('adminOnly');
+    // ensure modal buttons exist
+    createAMPMButtons();
+    document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') hideScheduleModal(); });
+
+    const rolePill = document.getElementById('rolePill');
+
+    async function loadTelemetry(){
+      const res = await fetch('/api/telemetry', {cache:'no-store'});
+      if(!res.ok){
+        // If forbidden, bounce to login
+        window.location.href = '/';
+        return;
+      }
+      const data = await res.json();
+      document.getElementById('time').textContent = data.time || '-';
+      document.getElementById('status').textContent = data.status || '-';
+      document.getElementById('ssid').textContent = data.ssid || '-';
+
+      const role = data.role || 'Guest';
+      if(role === 'SuperAdmin'){
+        rolePill.className = 'pill admin';
+        rolePill.textContent = 'Role: SuperAdmin';
+        adminOnlyEl.classList.remove('hidden');
+        refreshSchedules();
+        refreshLogs();
+      } else if(role === 'Admin'){
+        rolePill.className = 'pill admin';
+        rolePill.textContent = 'Role: Admin';
+        adminOnlyEl.classList.remove('hidden');
+        refreshSchedules();
+        // Admin should not access logs (firmware forbids)
+      } else if(role === 'User'){
+        rolePill.className = 'pill staff';
+        rolePill.textContent = 'Role: User';
+        adminOnlyEl.classList.add('hidden');
+      } else {
+        rolePill.className = 'pill';
+        rolePill.textContent = 'Role: Guest';
+        adminOnlyEl.classList.add('hidden');
+        window.location.href = '/';
+      }
+
+    }
+
+    async function ringBell(){
+      const msg = document.getElementById('ringMsg');
+      msg.textContent = 'Dispatching...';
+      const res = await fetch('/ring', {method:'GET'});
+      if(!res.ok){
+        msg.textContent = 'Failed (not authorized?)';
+        return;
+      }
+      msg.textContent = 'Bell Dispatched.';
+      setTimeout(()=>{msg.textContent=''}, 3000);
+    }
+
+    document.getElementById('ringBtn').addEventListener('click', ringBell);
+
+    function normalizeHHMM(input){
+      if(!input) return '';
+      const v = String(input).trim();
+      // Allow users to type "8:30" and we normalize to "08:30".
+      const m = v.match(/^\s*(\d{1,2})\s*:\s*(\d{2})\s*$/);
+      if(!m) return '';
+      const hh = Number(m[1]);
+      const mm = Number(m[2]);
+      if(Number.isNaN(hh) || Number.isNaN(mm)) return '';
+      if(hh < 0 || hh > 23 || mm < 0 || mm > 59) return '';
+      return String(hh).padStart(2,'0') + ':' + String(mm).padStart(2,'0');
+    }
+
+    function drawDial(dialEl, value, opts){
+      // opts: {min, max, step, label}
+      const min = opts.min;
+      const max = opts.max;
+      const step = opts.step || 1;
+
+      const clamped = Math.min(max, Math.max(min, value));
+      dialEl.dataset.value = String(clamped);
+
+      const pct = (clamped - min) / (max - min);
+      const angle = -135 + (pct * 270);
+
+      const hand = dialEl.querySelector('.dial-hand');
+      const valueEl = dialEl.querySelector('.dial-value');
+      if(hand) hand.style.transform = 'rotate(' + angle + 'deg)';
+      if(valueEl) valueEl.textContent = String(clamped).padStart(2,'0');
+    }
+
+    function makeConcentricTimeDial(initialHHMM, onChange){
+      // Dial uses two concentric dials: hour (inner) and minute (outer)
+      const hhmm = normalizeHHMM(initialHHMM) || '00:00';
+      const [hhS, mmS] = hhmm.split(':');
+      let hh = Number(hhS);
+      let mm = Number(mmS);
+
+      const root = document.createElement('div');
+      root.style.display = 'flex';
+      root.style.gap = '10px';
+      root.style.alignItems = 'center';
+
+      const dialWrap = document.createElement('div');
+      dialWrap.style.display = 'flex';
+      dialWrap.style.gap = '12px';
+      dialWrap.style.alignItems = 'center';
+
+      function createDial(opts){
+        const dial = document.createElement('div');
+        dial.className = 'time-dial';
+        dial.style.width = (opts.size || 90) + 'px';
+        dial.style.height = (opts.size || 90) + 'px';
+        dial.style.position = 'relative';
+        dial.style.userSelect = 'none';
+        dial.style.touchAction = 'manipulation';
+
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('width', opts.size || 90);
+        svg.setAttribute('height', opts.size || 90);
+        svg.setAttribute('viewBox', '0 0 100 100');
+
+        const bg = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        bg.setAttribute('cx','50'); bg.setAttribute('cy','50'); bg.setAttribute('r', String(opts.r || 40));
+        bg.setAttribute('fill','none'); bg.setAttribute('stroke', opts.strokeTrack || '#eee');
+        bg.setAttribute('stroke-width', String(opts.trackWidth || 10));
+
+        const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        arc.setAttribute('d','M 15 50 A 35 35 0 0 1 85 50');
+        arc.setAttribute('fill','none');
+        arc.setAttribute('stroke', opts.strokeColor || '#800000');
+        arc.setAttribute('stroke-width', String(opts.trackWidth || 10));
+        arc.setAttribute('stroke-linecap','round');
+        arc.setAttribute('opacity','0.55');
+
+        const hand = document.createElement('div');
+        hand.className = 'dial-hand';
+        hand.style.position = 'absolute';
+        hand.style.left = '50%';
+        hand.style.top = '50%';
+        hand.style.width = '2px';
+        hand.style.height = String((opts.r || 40)) + 'px';
+        hand.style.background = (opts.strokeColor || '#800000');
+        hand.style.transformOrigin = '50% 100%';
+        hand.style.borderRadius = '2px';
+        hand.style.translate = '-50% -100%';
+        hand.style.pointerEvents = 'none';
+
+        const center = document.createElement('div');
+        center.style.position='absolute';
+        center.style.left='50%';
+        center.style.top='50%';
+        center.style.width='10px';
+        center.style.height='10px';
+        center.style.background=(opts.strokeColor || '#800000');
+        center.style.borderRadius='50%';
+        center.style.translate='-50% -50%';
+        center.style.pointerEvents='none';
+
+        const value = document.createElement('div');
+        value.className = 'dial-value';
+        value.style.position='absolute';
+        value.style.left='50%';
+        value.style.top='55%';
+        value.style.transform='translate(-50%,-50%)';
+        value.style.fontWeight='900';
+        value.style.fontSize='16px';
+        value.style.color=opts.strokeColor || '#800000';
+        value.textContent = '00';
+        value.style.pointerEvents='none';
+
+        const cap = document.createElement('div');
+        cap.style.position='absolute';
+        cap.style.left='50%';
+        cap.style.top='84%';
+        cap.style.transform='translateX(-50%)';
+        cap.style.fontSize='11px';
+        cap.style.fontWeight='800';
+        cap.style.color='#666';
+        cap.style.pointerEvents='none';
+        cap.textContent = opts.label;
+
+        dial.appendChild(svg);
+        svg.appendChild(bg);
+        svg.appendChild(arc);
+        dial.appendChild(hand);
+        dial.appendChild(center);
+        dial.appendChild(value);
+        dial.appendChild(cap);
+
+        let dragging = false;
+        let startY = 0;
+        let startVal = opts.initial || 0;
+
+        function updateFromDelta(delta){
+          const deltaUnits = Math.round(delta / 2); // sensitivity
+          const next = startVal + (deltaUnits * (opts.step || 1));
+          const normalized = Math.min(opts.max, Math.max(opts.min, next));
+          drawDial(dial, normalized, opts);
+          if(typeof onChange === 'function') onChange(opts.which, normalized);
+        }
+
+        dial.addEventListener('pointerdown', (e)=>{
+          dragging = true;
+          startY = e.clientY;
+          startVal = Number(dial.dataset.value || (opts.initial || 0));
+          dial.setPointerCapture(e.pointerId);
+        });
+        dial.addEventListener('pointerup', ()=>{ dragging = false; });
+        dial.addEventListener('pointercancel', ()=>{ dragging = false; });
+        dial.addEventListener('pointermove', (e)=>{
+          if(!dragging) return;
+          const delta = e.clientY - startY;
+          updateFromDelta(delta);
+        });
+
+        // initial render
+        drawDial(dial, opts.initial || 0, opts);
+        return dial;
+      }
+
+      const hourDial = createDial({
+        which:'hh', label:'HOUR', min:0, max:23, step:1, initial:hh, size:92, r:34, strokeColor:'#800000', trackWidth:10
+      });
+      const minDial = createDial({
+        which:'mm', label:'MIN', min:0, max:59, step:1, initial:mm, size:92, r:40, strokeColor:'#0b4a87', trackWidth:10
+      });
+
+      dialWrap.appendChild(hourDial);
+      dialWrap.appendChild(minDial);
+
+      function handleDialChange(which, val){
+        if(which === 'hh') hh = val;
+        if(which === 'mm') mm = val;
+        if(typeof onChange === 'function'){
+          onChange(makeHHMMString(hh, mm));
+        }
+      }
+
+      // rewire onChange to update dials correctly
+      hourDial.addEventListener('pointerup', ()=>{
+        if(typeof onChange === 'function') onChange(makeHHMMString(hh, mm));
+      });
+      minDial.addEventListener('pointerup', ()=>{
+        if(typeof onChange === 'function') onChange(makeHHMMString(hh, mm));
+      });
+
+      function makeHHMMString(hhVal, mmVal){
+        return String(hhVal).padStart(2,'0') + ':' + String(mmVal).padStart(2,'0');
+      }
+
+      // Override createDial callbacks by setting local handlers
+      // (We can't pass onChange directly inside createDial without capturing which.)
+      hourDial.querySelector('.dial-hand');
+
+      // Instead, we update hh/mm inside createDial via onChange param.
+      // So we re-create dials with correct callback signature.
+      // (To keep changes minimal, we'll just set a shared callback by replacing the dials.)
+
+      dialWrap.innerHTML = '';
+      const hourDial2 = createDial({
+        which:'hh', label:'HOUR', min:0, max:23, step:1, initial:hh, size:92, r:34, strokeColor:'#800000', trackWidth:10
+      });
+      const minDial2 = createDial({
+        which:'mm', label:'MIN', min:0, max:59, step:1, initial:mm, size:92, r:40, strokeColor:'#0b4a87', trackWidth:10
+      });
+      dialWrap.appendChild(hourDial2);
+      dialWrap.appendChild(minDial2);
+
+      // hook pointer move by reading dataset value
+      function syncFromDial(){
+        const hhStr = hourDial2.dataset.value;
+        const mmStr = minDial2.dataset.value;
+        hh = Number(hhStr);
+        mm = Number(mmStr);
+        if(typeof onChange === 'function') onChange(makeHHMMString(hh, mm));
+      }
+      hourDial2.addEventListener('pointermove', syncFromDial);
+      minDial2.addEventListener('pointermove', syncFromDial);
+      syncFromDial();
+
+      root.appendChild(dialWrap);
+      return root;
+    }
+
+
+    async function refreshSchedules(){
+
+      const res = await fetch('/api/schedules', {cache:'no-store'});
+      if(!res.ok) return;
+      const list = await res.json();
+
+      // keep for edit modal lookup
+      window.__scheduleLastList = list;
+
+      const body = document.getElementById('schedBody');
+      body.innerHTML = '';
+
+      list.forEach((t, idx)=>{
+        const tr = document.createElement('tr');
+        const timeCell = document.createElement('td');
+        const actionCell = document.createElement('td');
+        actionCell.style.display = 'flex';
+        actionCell.style.gap = '8px';
+        actionCell.style.flexWrap = 'wrap';
+
+        timeCell.textContent = t;
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn secondary';
+        editBtn.style.padding = '7px 10px';
+        editBtn.style.fontSize = '13px';
+        editBtn.textContent = 'Edit';
+        editBtn.addEventListener('click', () => openEditScheduleModal(idx));
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn danger';
+        delBtn.style.padding = '7px 10px';
+        delBtn.style.fontSize = '13px';
+        delBtn.textContent = 'Delete';
+        delBtn.addEventListener('click', () => deleteSchedule(idx));
+
+        actionCell.appendChild(editBtn);
+        actionCell.appendChild(delBtn);
+
+        const idxCell = document.createElement('td');
+        idxCell.textContent = idx;
+
+        tr.appendChild(idxCell);
+        tr.appendChild(timeCell);
+        tr.appendChild(actionCell);
+        body.appendChild(tr);
+      });
+    }
+
+    // ------------------- Schedule Modals (Add/Edit) with Analog Dials + AM/PM -------------------
+
+    function mmToHHMM_24(hh12, mm, ampm){
+      // hh12: 1..12
+      // ampm: 'AM' or 'PM'
+      let h = hh12 % 12; // 12 -> 0
+      if(ampm === 'PM') h += 12;
+      return String(h).padStart(2,'0') + ':' + String(mm).padStart(2,'0');
+    }
+
+    function hhmm24To12(hhmm){
+      const norm = normalizeHHMM(hhmm) || '00:00';
+      const [hS, mS] = norm.split(':');
+      const h24 = Number(hS);
+      const m = Number(mS);
+      const ampm = h24 >= 12 ? 'PM' : 'AM';
+      let h12 = h24 % 12;
+      if(h12 === 0) h12 = 12;
+      return {hh12: h12, mm: m, ampm};
+    }
+
+    function setActiveAMPM(ampm){
+      const amBtn = document.getElementById('ampmAM');
+      const pmBtn = document.getElementById('ampmPM');
+      if(!amBtn || !pmBtn) return;
+      if(ampm === 'AM'){
+        amBtn.classList.add('active');
+        pmBtn.classList.remove('active');
+      } else {
+        pmBtn.classList.add('active');
+        amBtn.classList.remove('active');
+      }
+    }
+
+    function showScheduleModal(){
+      document.getElementById('schedModal').style.display = 'flex';
+    }
+
+    function hideScheduleModal(){
+      document.getElementById('schedModal').style.display = 'none';
+    }
+
+    function createAMPMButtons(){
+      // injected in modal once (guard)
+      if(document.getElementById('ampmAM')) return;
+      const wrap = document.getElementById('ampmWrap');
+      if(!wrap) return;
+
+      wrap.innerHTML = '';
+
+
+      const makeBtn = (id, label) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.id = id;
+        b.className = 'ampmBtn';
+        b.textContent = label;
+        return b;
+      };
+
+      const amBtn = makeBtn('ampmAM','AM');
+      const pmBtn = makeBtn('ampmPM','PM');
+
+      amBtn.onclick = ()=>{ window.__schedAMPM = 'AM'; setActiveAMPM('AM'); };
+      pmBtn.onclick = ()=>{ window.__schedAMPM = 'PM'; setActiveAMPM('PM'); };
+
+      wrap.appendChild(amBtn);
+      wrap.appendChild(pmBtn);
+    }
+
+    function openAddScheduleModal(){
+      window.__editingScheduleIndex = null;
+      window.__schedDraftHHMM = '00:00';
+      window.__schedAMPM = 'AM';
+
+      // initialize with current time in 12h (optional)
+      // We’ll default to 08:00? Keep simple: 00:00.
+      initScheduleModalDial('00:00');
+      setActiveAMPM('AM');
+      showScheduleModal();
+    }
+
+    function openEditScheduleModal(index){
+      window.__editingScheduleIndex = index;
+      const t = window.__scheduleLastList?.[index] ?? null;
+      if(!t){
+        // fallback: refresh schedules first then user can retry
+        refreshSchedules();
+        alert('Could not load schedule for editing. Try again.');
+        return;
+      }
+
+      const parsed = hhmm24To12(t);
+      window.__schedAMPM = parsed.ampm;
+      initScheduleModalDial(t);
+      setActiveAMPM(parsed.ampm);
+      showScheduleModal();
+    }
+
+    let __schedModalDialUI = null;
+    function initScheduleModalDial(hhmm24){
+      // Mobile-friendly spinner time picker (scrollable columns)
+      const parsed = hhmm24To12(hhmm24);
+      const hh12 = parsed.hh12;
+      const mm = parsed.mm;
+
+      const host = document.getElementById('schedDialHost');
+      if(!host) return;
+      host.innerHTML = '';
+
+      const colStyle = {
+        flex: '1',
+        minWidth: '120px',
+        maxWidth: '160px',
+      };
+
+      const wrap = document.createElement('div');
+      wrap.style.display = 'flex';
+      wrap.style.gap = '14px';
+      wrap.style.alignItems = 'flex-start';
+      wrap.style.justifyContent = 'center';
+
+      const makeSpinner = (label, minV, maxV, pad2, initialV) => {
+        const spinnerWrap = document.createElement('div');
+        spinnerWrap.style.display = 'flex';
+        spinnerWrap.style.flexDirection = 'column';
+        spinnerWrap.style.alignItems = 'center';
+        spinnerWrap.style.gap = '8px';
+
+        const topLabel = document.createElement('div');
+        topLabel.className = 'small';
+        topLabel.style.fontWeight = '900';
+        topLabel.style.color = '#333';
+        topLabel.textContent = label;
+
+        // viewport
+        const viewport = document.createElement('div');
+        viewport.style.width = '140px';
+        viewport.style.height = '210px';
+        viewport.style.overflowY = 'auto';
+        viewport.style.scrollBehavior = 'smooth';
+        viewport.style.borderRadius = '14px';
+        viewport.style.border = '1px solid #eee';
+        viewport.style.background = '#fafafa';
+        viewport.style.webkitOverflowScrolling = 'touch';
+        viewport.style.position = 'relative';
+
+        const tick = 28; // item height
+        const centerLine = document.createElement('div');
+        centerLine.style.position = 'absolute';
+        centerLine.style.left = '0';
+        centerLine.style.right = '0';
+        centerLine.style.top = '50%';
+        centerLine.style.transform = 'translateY(-50%)';
+        centerLine.style.height = '2px';
+        centerLine.style.background = '#800000';
+        centerLine.style.pointerEvents = 'none';
+
+        // inner list
+        const list = document.createElement('div');
+        list.style.paddingTop = '105px';
+        list.style.paddingBottom = '105px';
+
+        // Infinite-like scroll: repeat the value range many times
+        const values = [];
+        for(let v=minV; v<=maxV; v++) values.push(v);
+
+        const REPEAT = 20;
+        const extended = [];
+        for(let k=0;k<REPEAT;k++) extended.push(...values);
+
+        extended.forEach(v => {
+          const item = document.createElement('div');
+          item.style.height = tick + 'px';
+          item.style.display = 'flex';
+          item.style.alignItems = 'center';
+          item.style.justifyContent = 'center';
+          item.style.fontWeight = '900';
+          item.style.fontSize = '18px';
+          item.style.color = '#222';
+          item.textContent = pad2 ? String(v).padStart(2,'0') : String(v);
+          item.dataset.value = String(v);
+          list.appendChild(item);
+        });
+
+        viewport.appendChild(centerLine);
+        viewport.appendChild(list);
+
+        // helper to scroll to value (centered within the repeated list)
+        const indexOf = (v) => v - minV;
+        const baseIndex = Math.floor(REPEAT/2) * values.length;
+        const scrollToValue = (v) => {
+          const idx = indexOf(v);
+          viewport.scrollTop = ((baseIndex + idx) * tick);
+        };
+
+        // compute current
+        const readValue = () => {
+          const rawIdx = Math.round(viewport.scrollTop / tick);
+          const rel = rawIdx - baseIndex;
+          const mod = ((rel % values.length) + values.length) % values.length;
+          return values[mod];
+        };
+
+        // set initial (centered)
+        requestAnimationFrame(()=>{
+          scrollToValue(initialV);
+        });
+
+        let changeHandler = null;
+        const onChange = (fn) => { changeHandler = fn; };
+
+        let raf = null;
+        viewport.addEventListener('scroll', ()=>{
+          if(raf) cancelAnimationFrame(raf);
+          raf = requestAnimationFrame(()=>{
+            const v = readValue();
+            if(typeof changeHandler === 'function') changeHandler(v);
+          });
+        }, {passive:true});
+
+        return {spinnerWrap, viewport, onChange, readValue, scrollToValue};
+      };
+
+      const hourSpin = makeSpinner('HOUR', 1, 12, false, hh12);
+      const minSpin = makeSpinner('MIN', 0, 59, true, mm);
+
+      wrap.appendChild(hourSpin.spinnerWrap);
+      wrap.appendChild(minSpin.spinnerWrap);
+
+      // attach labels and order
+      hourSpin.spinnerWrap.appendChild(hourSpin.viewport);
+      hourSpin.spinnerWrap.insertBefore(hourSpin.spinnerWrap.firstChild, hourSpin.spinnerWrap.firstChild);
+
+      // fix: build spinnerWrap content properly
+      // (we already created topLabel but didn't attach to spinnerWrap)
+      // Let's reconstruct simply:
+      hourSpin.spinnerWrap.innerHTML = '';
+      minSpin.spinnerWrap.innerHTML = '';
+
+      const assemble = (sp, labelText) => {
+        const topLabel = document.createElement('div');
+        topLabel.className = 'small';
+        topLabel.style.fontWeight = '900';
+        topLabel.style.color = '#333';
+        topLabel.textContent = labelText;
+        sp.spinnerWrap.style.alignItems = 'center';
+        sp.spinnerWrap.style.display = 'flex';
+        sp.spinnerWrap.style.flexDirection = 'column';
+        sp.spinnerWrap.style.gap = '8px';
+        sp.spinnerWrap.appendChild(topLabel);
+        sp.spinnerWrap.appendChild(sp.viewport);
+      };
+      assemble(hourSpin, 'HOUR');
+      assemble(minSpin, 'MIN');
+
+      wrap.innerHTML = '';
+      wrap.appendChild(hourSpin.spinnerWrap);
+      wrap.appendChild(minSpin.spinnerWrap);
+
+      host.appendChild(wrap);
+
+      const syncDraft = () => {
+        const hh = hourSpin.readValue();
+        const mmv = minSpin.readValue();
+        const ampm = window.__schedAMPM || 'AM';
+        const hhmm24 = mmToHHMM_24(hh, mmv, ampm);
+        window.__schedDraftHHMM = hhmm24;
+        const preview = document.getElementById('schedPreview');
+        if(preview) preview.textContent = 'Selected: ' + hhmm24 + ' (' + ampm + ')';
+      };
+
+      hourSpin.onChange(()=>syncDraft());
+      minSpin.onChange(()=>syncDraft());
+      syncDraft();
+    }
+
+    function updateScheduleTableActions(){
+      // no-op placeholder (keeps structure readable)
+    }
+
+    async function confirmScheduleModalSave(){
+      const index = window.__editingScheduleIndex;
+      const hhmm24 = normalizeHHMM(window.__schedDraftHHMM);
+      if(!hhmm24){ alert('Invalid time selected.'); return; }
+
+      if(index === null || index === undefined){
+        const res = await fetch('/addSchedule', {
+          method:'POST',
+          headers:{'Content-Type':'application/x-www-form-urlencoded'},
+          body:`sched_time=${encodeURIComponent(hhmm24)}`
+        });
+        if(!res.ok){ alert('Add failed'); return; }
+      } else {
+        const res = await fetch('/editSchedule', {
+          method:'POST',
+          headers:{'Content-Type':'application/x-www-form-urlencoded'},
+          body:`index=${encodeURIComponent(index)}&sched_time=${encodeURIComponent(hhmm24)}`
+        });
+        if(!res.ok){ alert('Edit failed'); return; }
+      }
+
+      hideScheduleModal();
+      window.__editingScheduleIndex = null;
+      window.__scheduleLastList = null;
+      refreshSchedules();
+    }
+
+    async function deleteSchedule(index){
+      const ok = confirm('Delete schedule time ' + (document.querySelector('#schedBody tr:nth-child('+(index+1)+') td:nth-child(2)')?.textContent || '') + '?');
+      if(!ok) return;
+
+      const res = await fetch('/deleteSchedule', {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:`index=${encodeURIComponent(index)}`
+      });
+      if(!res.ok){ alert('Delete failed'); return; }
+      window.__editingScheduleIndex = null;
+      refreshSchedules();
+    }
+
+
+
+    async function refreshLogs(){
+      const res = await fetch('/backend/logs', {cache:'no-store'});
+      if(!res.ok){ document.getElementById('logs').value='Forbidden'; return; }
+      const text = await res.text();
+      document.getElementById('logs').value = text || '';
+    }
+
+    function triggerUploadLog(){
+      const fileInput = document.getElementById('logUploadFile');
+      if(!fileInput.files || !fileInput.files[0]){ alert('Choose a .txt log file first'); return; }
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const text = reader.result || '';
+        const res = await fetch('/backend/logs/upload', {
+          method: 'POST',
+          headers: {'Content-Type': 'text/plain'},
+          body: text
+        });
+        if(!res.ok){ alert('Upload failed'); return; }
+        alert('Upload successful');
+        refreshLogs();
+      };
+      reader.readAsText(file);
+    }
+
+
+    async function saveNetwork(){
+      const ap = document.getElementById('ap_name').value.trim();
+      const ssid = document.getElementById('station_ssid').value.trim();
+      const pass = document.getElementById('station_pass').value;
+
+      const msg = document.getElementById('netMsg');
+      msg.textContent = 'Saving...';
+
+      const res = await fetch('/saveNetwork', {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:`ap_name=${encodeURIComponent(ap)}&station_ssid=${encodeURIComponent(ssid)}&station_pass=${encodeURIComponent(pass)}`
+      });
+
+      if(!res.ok){ msg.textContent='Save failed'; return; }
+      msg.textContent = 'Saved. You may need to wait for time sync.';
+      setTimeout(()=>{msg.textContent=''}, 5000);
+      refreshLogs();
+    }
+
+    // Init: telemetry first, then admin panels based on role
+    loadTelemetry();
+  </script>
+  </body>
+</html>
+
+
