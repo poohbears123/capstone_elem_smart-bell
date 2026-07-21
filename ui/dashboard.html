@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FCU Smart Bell - Dashboard</title>
+  <style>
+    :root{--maroon:#800000;--bg:#f4f4f4;--card:#fff;--text:#111;--muted:#666;--danger:#b00020;--ok:#0b7a0b;}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{background:var(--maroon);color:#fff;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    header .brand{font-weight:800}
+    header .right{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+    header button{background:#fff;color:var(--maroon);border:0;border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer}
+
+    .wrap{max-width:980px;margin:18px auto;padding:0 12px 28px}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px}
+    @media(min-width:900px){.grid{grid-template-columns:1.1fr 0.9fr}}
+
+    .card{background:var(--card);border-radius:14px;box-shadow:0 4px 10px rgba(0,0,0,0.06);padding:16px}
+    h3{margin:0 0 10px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+    label{font-size:12px;color:var(--muted);font-weight:700;display:block;margin:10px 0 6px}
+    input,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:14px}
+
+    .btn{background:var(--maroon);color:#fff;border:0;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer}
+    .btn.secondary{background:#eee;color:#222;border:1px solid #ddd}
+    .btn.danger{background:var(--danger)}
+
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{border-bottom:1px solid #eee;padding:9px 6px;text-align:left;font-size:14px}
+    th{color:#444}
+    .pill{display:inline-block;padding:5px 10px;border-radius:999px;font-weight:900;font-size:12px;background:#f1f1f1}
+    .pill.admin{background:#ffecec;color:#800000}
+    .pill.staff{background:#e9f3ff;color:#0b4a87}
+
+    .muted{color:var(--muted)}
+    .status{font-weight:800}
+    textarea{width:100%;min-height:180px;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+
+    .hidden{display:none}
+    .small{font-size:12px;color:var(--muted);line-height:1.35}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">FCU Smart Bell Dashboard</div>
+    <div class="right">
+    <span id="rolePill" class="pill">Role: ...</span>
+
+      <button class="secondary" onclick="location.href='/logout'">Logout</button>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="grid">
+      <div class="card">
+        <h3>Telemetry</h3>
+        <div class="row" style="justify-content:space-between">
+          <div>
+            <div class="muted">Device Time</div>
+            <div id="time" class="status">...</div>
+          </div>
+          <div>
+            <div class="muted">Bell Status</div>
+            <div id="status" class="status">...</div>
+          </div>
+          <div>
+            <div class="muted">Current SSID</div>
+            <div id="ssid" class="status">...</div>
+          </div>
+        </div>
+
+        <div style="margin-top:14px" class="row">
+          <button class="btn" id="ringBtn">Ring Bell (3s)</button>
+          <span id="ringMsg" class="small"></span>
+        </div>
+
+        <div id="adminOnly" class="hidden">
+          <hr style="border:0;border-top:1px solid #eee;margin:16px 0" />
+          <h3>Admin Tools</h3>
+
+          <div class="card" style="padding:0;box-shadow:none;border:0">
+            <div style="padding:16px 0">
+              <h4 style="margin:0 0 10px">Schedules</h4>
+
+              <div class="row">
+                <div style="flex:1;min-width:190px">
+                  <label for="sched_time">Add Schedule Time (HH:MM)</label>
+                  <input id="sched_time" type="text" placeholder="e.g., 08:30" />
+                </div>
+                <div style="flex:0;align-self:flex-end">
+                  <button class="btn" style="margin-top:18px" onclick="addSchedule()">Add</button>
+                </div>
+              </div>
+
+              <div class="small" style="margin-top:8px">Stored values are reloaded on boot from `/schedule.txt` (on SD).</div>
+
+              <div class="row" style="margin-top:12px;justify-content:space-between">
+                <div class="muted">Existing schedules</div>
+                <button class="btn secondary" onclick="refreshSchedules()">Refresh</button>
+              </div>
+
+              <div style="overflow:auto;max-height:260px">
+                <table>
+                  <thead>
+                    <tr><th>#</th><th>Time</th><th>Action</th></tr>
+                  </thead>
+                  <tbody id="schedBody"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <hr style="border:0;border-top:1px solid #eee" />
+
+            <div style="padding:16px 0">
+              <h4 style="margin:0 0 10px">Network Settings</h4>
+              <div class="row">
+                <div style="flex:1;min-width:200px">
+                  <label for="ap_name">AP SSID</label>
+                  <input id="ap_name" type="text" placeholder="e.g., FCU_Secure_Bell" />
+                </div>
+                <div style="flex:1;min-width:200px">
+                  <label for="station_ssid">Station SSID</label>
+                  <input id="station_ssid" type="text" placeholder="e.g., MyWiFi" />
+                </div>
+              </div>
+              <label for="station_pass">Station Password</label>
+              <input id="station_pass" type="password" placeholder="WiFi password" />
+              <div class="row" style="margin-top:10px">
+                <button class="btn" onclick="saveNetwork()">Save & Sync Time</button>
+                <span id="netMsg" class="small"></span>
+              </div>
+              <div class="small" style="margin-top:8px">This updates `/config.txt` on the SD card.</div>
+            </div>
+
+            <hr style="border:0;border-top:1px solid #eee" />
+
+            <div style="padding:16px 0">
+              <h4 style="margin:0 0 10px">Security Logs (SuperAdmin)</h4>
+
+              <div class="row" style="justify-content:space-between">
+
+                <button class="btn secondary" onclick="refreshLogs()">Refresh Logs</button>
+                <span class="small muted">Read-only</span>
+              </div>
+              <textarea id="logs" readonly></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Quick Info</h3>
+        <div class="small">
+          If you get redirected back to the login page, your session may have expired.
+          <br/><br/>
+          Tip: For best results, keep the SD card files in these paths:
+          <br/>
+          <b>/ui/login.html</b> and <b>/ui/dashboard.html</b>
+          <br/><br/>
+          Logs will be displayed here after being written by the firmware.
+        </div>
+
+        <div style="margin-top:16px" class="small">
+          <b>API endpoints used:</b>
+          <ul>
+            <li>/api/telemetry</li>
+            <li>/ring</li>
+            <li>/api/schedules</li>
+            <li>/addSchedule</li>
+            <li>/deleteSchedule</li>
+
+            <li>/backend/logs (SuperAdmin only)</li>
+            <li>/saveNetwork</li>
+
+
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const adminOnlyEl = document.getElementById('adminOnly');
+    const rolePill = document.getElementById('rolePill');
+
+    async function loadTelemetry(){
+      const res = await fetch('/api/telemetry', {cache:'no-store'});
+      if(!res.ok){
+        // If forbidden, bounce to login
+        window.location.href = '/';
+        return;
+      }
+      const data = await res.json();
+      document.getElementById('time').textContent = data.time || '-';
+      document.getElementById('status').textContent = data.status || '-';
+      document.getElementById('ssid').textContent = data.ssid || '-';
+
+      const role = data.role || 'Guest';
+      if(role === 'SuperAdmin'){
+        rolePill.className = 'pill admin';
+        rolePill.textContent = 'Role: SuperAdmin';
+        adminOnlyEl.classList.remove('hidden');
+        refreshSchedules();
+        refreshLogs();
+      } else if(role === 'Admin'){
+        rolePill.className = 'pill admin';
+        rolePill.textContent = 'Role: Admin';
+        adminOnlyEl.classList.remove('hidden');
+        refreshSchedules();
+        // Admin should not access logs (firmware forbids)
+      } else if(role === 'User'){
+        rolePill.className = 'pill staff';
+        rolePill.textContent = 'Role: User';
+        adminOnlyEl.classList.add('hidden');
+      } else {
+        rolePill.className = 'pill';
+        rolePill.textContent = 'Role: Guest';
+        adminOnlyEl.classList.add('hidden');
+        window.location.href = '/';
+      }
+
+    }
+
+    async function ringBell(){
+      const msg = document.getElementById('ringMsg');
+      msg.textContent = 'Dispatching...';
+      const res = await fetch('/ring', {method:'GET'});
+      if(!res.ok){
+        msg.textContent = 'Failed (not authorized?)';
+        return;
+      }
+      msg.textContent = 'Bell Dispatched.';
+      setTimeout(()=>{msg.textContent=''}, 3000);
+    }
+
+    document.getElementById('ringBtn').addEventListener('click', ringBell);
+
+    async function refreshSchedules(){
+      const res = await fetch('/api/schedules', {cache:'no-store'});
+      if(!res.ok) return;
+      const list = await res.json();
+      const body = document.getElementById('schedBody');
+      body.innerHTML = '';
+      list.forEach((t, idx)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${idx}</td>
+          <td>${t}</td>
+          <td>
+            <button class="btn danger" style="padding:7px 10px;font-size:13px" onclick="deleteSchedule(${idx})">Delete</button>
+          </td>
+        `;
+        body.appendChild(tr);
+      });
+    }
+
+    async function addSchedule(){
+      const val = document.getElementById('sched_time').value.trim();
+      if(!val){ alert('Enter a time like HH:MM'); return; }
+      const res = await fetch('/addSchedule', {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:`sched_time=${encodeURIComponent(val)}`
+      });
+      if(!res.ok){ alert('Add failed'); return; }
+      document.getElementById('sched_time').value='';
+      refreshSchedules();
+    }
+
+    async function deleteSchedule(index){
+      const res = await fetch('/deleteSchedule', {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:`index=${encodeURIComponent(index)}`
+      });
+      if(!res.ok){ alert('Delete failed'); return; }
+      refreshSchedules();
+    }
+
+    async function refreshLogs(){
+      const res = await fetch('/backend/logs', {cache:'no-store'});
+      if(!res.ok){ document.getElementById('logs').value='Forbidden'; return; }
+      const text = await res.text();
+      document.getElementById('logs').value = text || '';
+    }
+
+    async function saveNetwork(){
+      const ap = document.getElementById('ap_name').value.trim();
+      const ssid = document.getElementById('station_ssid').value.trim();
+      const pass = document.getElementById('station_pass').value;
+
+      const msg = document.getElementById('netMsg');
+      msg.textContent = 'Saving...';
+
+      const res = await fetch('/saveNetwork', {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:`ap_name=${encodeURIComponent(ap)}&station_ssid=${encodeURIComponent(ssid)}&station_pass=${encodeURIComponent(pass)}`
+      });
+
+      if(!res.ok){ msg.textContent='Save failed'; return; }
+      msg.textContent = 'Saved. You may need to wait for time sync.';
+      setTimeout(()=>{msg.textContent=''}, 5000);
+      refreshLogs();
+    }
+
+    // Init: telemetry first, then admin panels based on role
+    loadTelemetry();
+  </script>
+</body>
+</html>
+
