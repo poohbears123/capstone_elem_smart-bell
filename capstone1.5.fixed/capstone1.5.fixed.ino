@@ -9,6 +9,7 @@
 #include <mbedtls/md5.h>
 #include <esp_wifi.h>
 #include "time.h"
+#include <driver/i2s.h>
 
 // --- HARDWARE CONFIGURATION ---
 // MAX98357A (I2S) pin mapping
@@ -19,9 +20,11 @@ const int MAX98357A_DIN_PIN = 25;
 const int MAX98357A_BCLK_PIN = 26;
 const int MAX98357A_LRC_PIN = 27;
 
-// Legacy: keep BELL_PIN for the rest of the project if needed.
-// NOTE: If this firmware is purely for audio bell, BELL_PIN is no longer used.
-const int BELL_PIN = MAX98357A_DIN_PIN;
+// I2S configuration constants
+const i2s_port_t I2S_PORT = I2S_NUM_0;
+const int I2S_SAMPLE_RATE = 16000;  // 16 kHz sample rate
+const int I2S_BITS_PER_SAMPLE = 16; // 16-bit samples
+const int I2S_BUFFER_SIZE = 512;    // DMA buffer size
 
 const int SD_CS_PIN = 5;
 
@@ -318,10 +321,61 @@ bool connectAndSyncTime(String ssid, String pass) {
   return false;
 }
 
+void i2sPlayTone(int frequency, int durationMs) {
+  // Generate a square-wave tone at the given frequency for the given duration
+  // and write it to the I2S amplifier.
+  // Square wave: alternate between +amplitude and -amplitude samples.
+  int16_t sample_high = 16000;   // ~50% volume (max would be 32767)
+  int16_t sample_low  = -16000;
+
+  int samplesPerCycle = I2S_SAMPLE_RATE / frequency;
+  int halfCycleSamples = samplesPerCycle / 2;
+  if (halfCycleSamples < 1) halfCycleSamples = 1;
+
+  int totalSamples = (I2S_SAMPLE_RATE * durationMs) / 1000;
+  int samplesWritten = 0;
+
+  // We'll fill a buffer and write in chunks
+  const int CHUNK = 256;
+  int16_t buf[CHUNK];
+
+  while (samplesWritten < totalSamples) {
+    int remaining = totalSamples - samplesWritten;
+    int chunkSize = (remaining < CHUNK) ? remaining : CHUNK;
+
+    // Fill buffer with square wave
+    for (int i = 0; i < chunkSize; i++) {
+      int posInCycle = (samplesWritten + i) % samplesPerCycle;
+      buf[i] = (posInCycle < halfCycleSamples) ? sample_high : sample_low;
+    }
+
+    size_t bytesWritten = 0;
+    i2s_write(I2S_PORT, buf, chunkSize * sizeof(int16_t), &bytesWritten, portMAX_DELAY);
+    samplesWritten += bytesWritten / sizeof(int16_t);
+  }
+}
+
 void triggerPhysicalBell(int durationSeconds) {
-  digitalWrite(BELL_PIN, HIGH);
-  delay(durationSeconds * 1000);
-  digitalWrite(BELL_PIN, LOW);
+  // Play a buzzer-style tone sequence through the MAX98357A I2S amplifier.
+  // Sequence: 1kHz tone for the duration, with a brief pause in the middle
+  // to create a classic "bee-bee-bee" bell pattern if duration allows.
+
+  if (durationSeconds <= 1) {
+    i2sPlayTone(1000, durationSeconds * 1000);
+  } else {
+    // For longer rings, do an alternating pattern
+    int remainingMs = durationSeconds * 1000;
+    while (remainingMs > 0) {
+      int onMs = (remainingMs > 500) ? 500 : remainingMs;
+      i2sPlayTone(1000, onMs);
+      remainingMs -= onMs;
+      if (remainingMs > 100) {
+        // 100ms silence gap
+        i2sPlayTone(1, 100); // 1Hz = essentially silence for 100ms
+        remainingMs -= 100;
+      }
+    }
+  }
 }
 
 // --- STREAM SAFELY FROM SD CARD ---
@@ -622,10 +676,49 @@ void setupRoutes() {
   });
 }
 
+void setupI2S() {
+  // Configure and install the I2S driver for MAX98357A
+  i2s_config_t i2s_config = {
+    .mode = (i2s_mode_t)(I2S_MODE_MASTER | I2S_MODE_TX),
+    .sample_rate = I2S_SAMPLE_RATE,
+    .bits_per_sample = (i2s_bits_per_sample_t)I2S_BITS_PER_SAMPLE,
+    .channel_format = I2S_CHANNEL_FMT_ONLY_LEFT,
+    .communication_format = (i2s_comm_format_t)(I2S_COMM_FORMAT_STAND_I2S),
+    .intr_alloc_flags = ESP_INTR_FLAG_LEVEL1,
+    .dma_buf_count = 4,
+    .dma_buf_len = I2S_BUFFER_SIZE,
+    .use_apll = false,
+    .tx_desc_auto_clear = true,
+    .fixed_mclk = 0
+  };
+
+  i2s_pin_config_t pin_config = {
+    .bck_io_num = MAX98357A_BCLK_PIN,
+    .ws_io_num = MAX98357A_LRC_PIN,
+    .data_out_num = MAX98357A_DIN_PIN,
+    .data_in_num = I2S_PIN_NO_CHANGE
+  };
+
+  esp_err_t err = i2s_driver_install(I2S_PORT, &i2s_config, 0, NULL);
+  if (err != ESP_OK) {
+    Serial.println("I2S driver install failed!");
+    return;
+  }
+
+  err = i2s_set_pin(I2S_PORT, &pin_config);
+  if (err != ESP_OK) {
+    Serial.println("I2S set pin failed!");
+    return;
+  }
+
+  // Set I2S to mono left channel (right channel silenced)
+  i2s_set_clk(I2S_PORT, I2S_SAMPLE_RATE, (i2s_bits_per_sample_t)I2S_BITS_PER_SAMPLE, I2S_CHANNEL_MONO);
+  
+  Serial.println("I2S initialized for MAX98357A");
+}
+
 void setup() {
   Serial.begin(115200);
-  pinMode(BELL_PIN, OUTPUT);
-  digitalWrite(BELL_PIN, LOW);
 
   Wire.begin();
   rtc.begin();
@@ -641,6 +734,8 @@ void setup() {
   WiFi.softAPConfig(apIP, apIP, IPAddress(255, 255, 255, 0));
   WiFi.softAP(ap_ssid.c_str());
   if (sta_ssid != "") connectAndSyncTime(sta_ssid, sta_pass);
+
+  setupI2S();
 
   dnsServer.start(DNS_PORT, "*", apIP);
   setupRoutes();
