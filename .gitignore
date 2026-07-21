@@ -1,0 +1,22 @@
+# Arduino build artifacts
+build/
+*.elf
+*.hex
+*.bin
+*.o
+*.d
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Config with sensitive data
+data/config.txt
+data/schedule.txt
+

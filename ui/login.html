@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FCU Smart Bell - Login</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;text-align:center;background:#f4f4f4;padding-top:50px;}
+    .card{background:#fff;padding:28px;border-radius:12px;display:inline-block;box-shadow:0 4px 6px rgba(0,0,0,0.1);border-top:8px solid #800000;min-width:min(420px,92vw)}
+    input[type=text],input[type=password]{width:92%;padding:10px;margin:10px 0;border:1px solid #ccc;border-radius:8px;font-size:14px}
+    button{background:#800000;color:#fff;padding:11px 18px;border:none;border-radius:10px;cursor:pointer;width:95%;font-size:14px}
+    .error{color:#b00020;margin:8px 0;min-height:18px;font-weight:600}
+    .hint{color:#666;font-size:12px;margin-top:14px;line-height:1.3}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2 style="margin:0 0 6px;">FCU Smart Bell Login</h2>
+
+    <!-- Visible error area (fallback) -->
+    <div class="error" id="err" style="display:none;"></div>
+
+    <form action="/handleLogin" method="POST" autocomplete="off">
+      <input type="text" name="username" placeholder="Username" required />
+      <input type="password" name="password" placeholder="Password" required />
+      <button type="submit">Authenticate</button>
+    </form>
+
+    <div class="hint">After login, you’ll be redirected to the dashboard.</div>
+  </div>
+
+  <!-- Modal error popup -->
+  <div id="errModal" class="modal" style="display:none;">
+    <div class="box">
+      <h3>Login failed</h3>
+      <p id="errModalMsg"></p>
+      <div class="actions">
+        <button class="ok" type="button" onclick="hideModal(true)">OK</button>
+      </div>
+
+    </div>
+  </div>
+
+  <style>
+    .modal{position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.35);display:flex;align-items:center;justify-content:center;padding:18px;z-index:9999;}
+    .modal .box{background:#fff;border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,0.25);width:min(460px,92vw);padding:18px 18px 14px;border-top:8px solid #b00020;}
+    .modal h3{margin:0 0 6px;font-size:16px;}
+    .modal p{margin:0;color:#333;font-size:14px;}
+    .actions{margin-top:14px;text-align:right;}
+    .ok{background:#b00020;color:#fff;border:0;border-radius:10px;padding:10px 14px;font-weight:900;cursor:pointer;}
+  </style>
+
+  <script>
+    function getQueryParam(name){
+      const u = new URL(window.location.href);
+      return u.searchParams.get(name);
+    }
+
+    function showModal(msg){
+      const errEl = document.getElementById('err');
+      errEl.textContent = msg;
+      errEl.style.display = 'block';
+
+      document.getElementById('errModalMsg').textContent = msg;
+      document.getElementById('errModal').style.display = 'flex';
+    }
+
+    function hideModal(reloadPage){
+      document.getElementById('errModal').style.display = 'none';
+      if(reloadPage){
+        // Clear the querystring (if any) and fully reset UI state.
+        const u = new URL(window.location.href);
+        u.searchParams.delete('error');
+        window.location.href = u.pathname;
+      }
+    }
+
+
+    // If the firmware redirected/re-rendered with ?error=..., show popup.
+    const err = getQueryParam('error');
+    if (err) {
+      showModal(decodeURIComponent(err));
+    }
+  </script>
+</body>
+</html>
+

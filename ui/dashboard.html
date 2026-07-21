@@ -1,0 +1,643 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FCU Smart Bell - Dashboard</title>
+  <style>
+    :root{--maroon:#800000;--bg:#f4f4f4;--card:#fff;--text:#111;--muted:#666;--danger:#b00020;--ok:#0b7a0b;}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--text)}
+    header{background:var(--maroon);color:#fff;padding:16px 18px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    header .brand{font-weight:800}
+    header .right{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+    header button{background:#fff;color:var(--maroon);border:0;border-radius:10px;padding:9px 12px;font-weight:700;cursor:pointer}
+    .wrap{max-width:980px;margin:18px auto;padding:0 12px 28px}
+    .grid{display:grid;grid-template-columns:1fr;gap:14px}
+    @media(min-width:900px){.grid{grid-template-columns:1.1fr 0.9fr}}
+    .card{background:var(--card);border-radius:14px;box-shadow:0 4px 10px rgba(0,0,0,0.06);padding:16px}
+    h3{margin:0 0 10px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    label{font-size:12px;color:var(--muted);font-weight:700;display:block;margin:10px 0 6px}
+    input,select{width:100%;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:14px}
+    .btn{background:var(--maroon);color:#fff;border:0;border-radius:12px;padding:10px 14px;font-weight:800;cursor:pointer}
+    .btn.secondary{background:#eee;color:#222;border:1px solid #ddd}
+    .btn.danger{background:var(--danger)}
+    table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{border-bottom:1px solid #eee;padding:9px 6px;text-align:left;font-size:14px}
+    th{color:#444}
+    .pill{display:inline-block;padding:5px 10px;border-radius:999px;font-weight:900;font-size:12px;background:#f1f1f1}
+    .pill.admin{background:#ffecec;color:#800000}
+    .pill.staff{background:#e9f3ff;color:#0b4a87}
+    .muted{color:var(--muted)}
+    .status{font-weight:800}
+    textarea{width:100%;min-height:180px;padding:10px;border:1px solid #ddd;border-radius:10px;font-size:13px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    .hidden{display:none}
+    .small{font-size:12px;color:var(--muted);line-height:1.35}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">FCU Smart Bell Dashboard</div>
+    <div class="right">
+    <span id="rolePill" class="pill">Role: ...</span>
+      <button class="secondary" onclick="location.href='/logout'">Logout</button>
+    </div>
+  </header>
+  <div class="wrap">
+    <div class="grid">
+      <div class="card">
+        <h3>Telemetry</h3>
+        <div class="row" style="justify-content:space-between">
+          <div>
+            <div class="muted">Device Time</div>
+            <div id="time" class="status">...</div>
+          <div>
+            <div class="muted">Network &amp; Sync</div>
+            <div>
+              <span id="syncDot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#999;margin-right:4px;vertical-align:middle;"></span>
+              <span id="status" class="status">...</span>
+            </div>
+          <div>
+            <div class="muted">Connected SSID</div>
+            <div id="ssid" class="status">...</div>
+        </div>
+        <div style="margin-top:14px" class="row">
+          <button class="btn" id="ringBtn">Ring Bell (3s)</button>
+          <span id="ringMsg" class="small"></span>
+        </div>
+        <div id="adminOnly" class="hidden">
+          <hr style="border:0;border-top:1px solid #eee;margin:16px 0" />
+          <h3>Admin Tools</h3>
+          <div class="card" style="padding:0;box-shadow:none;border:0">
+            <div style="padding:16px 0">
+              <h4 style="margin:0 0 10px">Schedules</h4>
+              <div class="row">
+                <div style="flex:1;min-width:190px">
+                  <label>Schedule Time</label>
+                  <div class="small" style="margin-top:0">Tap "Add Schedule" to set time using analog dials (AM/PM).</div>
+                <div style="flex:0;align-self:flex-end;display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end">
+                  <button class="btn" style="margin-top:18px" onclick="openAddScheduleModal()">Add Schedule</button>
+                </div>
+              <div class="small" style="margin-top:8px">Stored values are reloaded on boot from /data/schedule.txt (SPIFFS).</div>
+              <div class="row" style="margin-top:12px;justify-content:space-between">
+                <div class="muted">Existing schedules</div>
+                <button class="btn secondary" onclick="refreshSchedules()">Refresh</button>
+              </div>
+              <div style="overflow:auto;max-height:260px">
+                <table>
+                  <thead>
+                    <tr><th style="width:56px">#</th><th>Time</th><th style="width:190px">Action</th></tr>
+                  </thead>
+                  <tbody id="schedBody"></tbody>
+                </table>
+              </div>
+            <hr style="border:0;border-top:1px solid #eee" />
+            <div style="padding:16px 0">
+              <h4 style="margin:0 0 10px">Network Settings</h4>
+              <div class="row">
+                <div style="flex:1;min-width:200px">
+                  <label for="ap_name">AP SSID</label>
+                  <input id="ap_name" type="text" placeholder="e.g., FCU_Secure_Bell" />
+                </div>
+                <div style="flex:1;min-width:200px">
+                  <label for="station_ssid">Station SSID</label>
+                  <input id="station_ssid" type="text" placeholder="e.g., MyWiFi" />
+                </div>
+              <label for="station_pass">Station Password</label>
+              <input id="station_pass" type="password" placeholder="WiFi password" />
+              <div class="row" style="margin-top:10px">
+                <button class="btn" onclick="saveNetwork()">Save &amp; Sync Time</button>
+                <span id="netMsg" class="small"></span>
+              </div>
+              <div class="small" style="margin-top:8px">This updates /data/config.txt on SPIFFS.</div>
+            <hr style="border:0;border-top:1px solid #eee" />
+            <div style="padding:16px 0">
+              <h4 style="margin:0 0 10px">Security Logs (SuperAdmin)</h4>
+              <div class="row" style="justify-content:space-between">
+                <button class="btn secondary" onclick="refreshLogs()">Download Logs</button>
+                <span class="small muted">Upload/Download</span>
+              </div>
+              <div class="row" style="margin-top:10px;gap:10px">
+                <button class="btn" onclick="triggerUploadLog()">Upload Logs</button>
+              </div>
+              <input id="logUploadFile" type="file" accept="text/plain" style="margin-top:10px" />
+              <textarea id="logs" readonly style="margin-top:10px"></textarea>
+            </div>
+        </div>
+      <div class="card">
+        <h3>Quick Info</h3>
+        <div class="small">
+          If you get redirected back to the login page, your session may have expired.
+          <br/><br/>
+          Tip: For best results, keep the SD card files in these paths:
+          <br/>
+          <b>/ui/login.html</b> and <b>/ui/dashboard.html</b>
+          <br/><br/>
+          Logs will be displayed here after being written by the firmware.
+        </div>
+        <div style="margin-top:16px" class="small">
+          <b>API endpoints used:</b>
+          <ul>
+            <li>/api/telemetry</li>
+            <li>/ring</li>
+            <li>/api/schedules</li>
+            <li>/addSchedule</li>
+            <li>/deleteSchedule</li>
+            <li>/backend/logs (SuperAdmin only)</li>
+            <li>/saveNetwork</li>
+          </ul>
+        </div>
+    </div>
+
+  <!-- Schedule Modal -->
+  <div id="schedModal" style="display:none;position:fixed;left:0;top:0;width:100%;height:100%;background:rgba(0,0,0,0.35);align-items:center;justify-content:center;padding:18px;z-index:10000;">
+    <div style="background:#fff;border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,0.25);width:min(620px,92vw);padding:18px 18px 14px;border-top:8px solid #800000;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div>
+          <h3 id="schedModalTitle" style="margin:0;">Schedule Time</h3>
+          <div id="schedPreview" class="small muted" style="margin-top:4px;">Selected: 00:00 (AM)</div>
+        <button type="button" class="btn secondary" style="padding:8px 12px;" onclick="hideScheduleModal()">Close</button>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;">
+        <div id="schedDialHost" style="flex:1;min-width:260px;"></div>
+        <div style="flex:0;min-width:160px;">
+          <div class="small" style="font-weight:900;color:#333;margin-bottom:8px;">AM / PM</div>
+          <div id="ampmWrap" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
+          <div class="small muted" style="margin-top:12px;">Scroll spinners to choose time.</div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" class="btn secondary" onclick="hideScheduleModal()" style="background:#eee;">Cancel</button>
+        <button type="button" class="btn" onclick="confirmScheduleModalSave()">Save</button>
+      </div>
+  </div>
+
+  <style>
+    .ampmBtn{border:1px solid #ddd;background:#f7f7f7;border-radius:12px;padding:10px 16px;font-weight:900;cursor:pointer;color:#222;}
+    .ampmBtn.active{background:#800000;color:#fff;border-color:#800000;}
+  </style>
+
+  <script>
+    const adminOnlyEl = document.getElementById('adminOnly');
+    createAMPMButtons();
+    document.addEventListener('keydown',(e)=>{ if(e.key==='Escape') hideScheduleModal(); });
+    const rolePill = document.getElementById('rolePill');
+
+    window.__deviceTime = null;
+    window.__deviceTimeSource = '';
+    let __clockInterval = null;
+
+    function parseServerTime(timeStr) {
+      if (!timeStr || timeStr === '-') return null;
+      const match = timeStr.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
+      if (!match) return null;
+      return new Date(match[1].replace(' ', 'T') + 'Z');
+    }
+
+    function extractTimeSource(timeStr) {
+      if (!timeStr) return '';
+      const m = timeStr.match(/\((.*?)\)$/);
+      return m ? ' (' + m[1] + ')' : '';
+    }
+
+    function formatDate(d) {
+      if (!d) return '-';
+      const Y = d.getUTCFullYear();
+      const M = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const D = String(d.getUTCDate()).padStart(2, '0');
+      const h = String(d.getUTCHours()).padStart(2, '0');
+      const m = String(d.getUTCMinutes()).padStart(2, '0');
+      const s = String(d.getUTCSeconds()).padStart(2, '0');
+      return Y + '-' + M + '-' + D + ' ' + h + ':' + m + ':' + s;
+    }
+
+    function startLocalClock() {
+      if (__clockInterval) clearInterval(__clockInterval);
+      __clockInterval = setInterval(() => {
+        if (window.__deviceTime) {
+          window.__deviceTime.setUTCSeconds(window.__deviceTime.getUTCSeconds() + 1);
+          document.getElementById('time').textContent = formatDate(window.__deviceTime) + window.__deviceTimeSource;
+        }
+      }, 1000);
+    }
+
+    function updateSyncIndicator(statusText) {
+      const dot = document.getElementById('syncDot');
+      if (!dot) return;
+      if (!statusText || statusText === '-') {
+        dot.style.background = '#999';
+      } else if (statusText.includes('Synced') || statusText.includes('Connected')) {
+        dot.style.background = '#0b7a0b';
+      } else if (statusText.includes('Connecting')) {
+        dot.style.background = '#f0a500';
+      } else if (statusText.includes('Failed') || statusText.includes('Error')) {
+        dot.style.background = '#b00020';
+      } else {
+        dot.style.background = '#999';
+      }
+    }
+
+    async function loadTelemetry(){
+      const res = await fetch('/api/telemetry', {cache:'no-store'});
+      if(!res.ok){
+        window.location.href = '/';
+        return;
+      }
+      const data = await res.json();
+
+      const parsed = parseServerTime(data.time);
+      if (parsed) {
+        window.__deviceTime = parsed;
+        window.__deviceTimeSource = extractTimeSource(data.time);
+        document.getElementById('time').textContent = data.time;
+        if (!__clockInterval) startLocalClock();
+      } else {
+        document.getElementById('time').textContent = data.time || '-';
+      }
+
+      document.getElementById('status').textContent = data.status || '-';
+      document.getElementById('ssid').textContent = data.ssid || '-';
+      updateSyncIndicator(data.status);
+
+      const role = data.role || 'Guest';
+      if(role === 'SuperAdmin'){
+        rolePill.className = 'pill admin';
+        rolePill.textContent = 'Role: SuperAdmin';
+        adminOnlyEl.classList.remove('hidden');
+        refreshSchedules();
+        refreshLogs();
+      } else if(role === 'Admin'){
+        rolePill.className = 'pill admin';
+        rolePill.textContent = 'Role: Admin';
+        adminOnlyEl.classList.remove('hidden');
+        refreshSchedules();
+      } else if(role === 'User'){
+        rolePill.className = 'pill staff';
+        rolePill.textContent = 'Role: User';
+        adminOnlyEl.classList.add('hidden');
+      } else {
+        rolePill.className = 'pill';
+        rolePill.textContent = 'Role: Guest';
+        adminOnlyEl.classList.add('hidden');
+        window.location.href = '/';
+      }
+    }
+
+    async function ringBell(){
+      const msg = document.getElementById('ringMsg');
+      msg.textContent = 'Dispatching...';
+      const res = await fetch('/ring', {method:'GET'});
+      if(!res.ok){
+        msg.textContent = 'Failed (not authorized?)';
+        return;
+      }
+      msg.textContent = 'Bell Dispatched.';
+      setTimeout(()=>{msg.textContent=''}, 3000);
+    }
+    document.getElementById('ringBtn').addEventListener('click', ringBell);
+
+    function normalizeHHMM(input){
+      if(!input) return '';
+      const v = String(input).trim();
+      const m = v.match(/^\s*(\d{1,2})\s*:\s*(\d{2})\s*$/);
+      if(!m) return '';
+      const hh = Number(m[1]);
+      const mm = Number(m[2]);
+      if(Number.isNaN(hh) || Number.isNaN(mm)) return '';
+      if(hh < 0 || hh > 23 || mm < 0 || mm > 59) return '';
+      return String(hh).padStart(2,'0') + ':' + String(mm).padStart(2,'0');
+    }
+
+    async function refreshSchedules(){
+      const res = await fetch('/api/schedules', {cache:'no-store'});
+      if(!res.ok) return;
+      const list = await res.json();
+      window.__scheduleLastList = list;
+      const body = document.getElementById('schedBody');
+      body.innerHTML = '';
+      list.forEach((t, idx)=>{
+        const tr = document.createElement('tr');
+        const idxCell = document.createElement('td');
+        idxCell.textContent = idx;
+        const timeCell = document.createElement('td');
+        timeCell.textContent = t;
+        const actionCell = document.createElement('td');
+        actionCell.style.display = 'flex';
+        actionCell.style.gap = '8px';
+        actionCell.style.flexWrap = 'wrap';
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn secondary';
+        editBtn.style.padding = '7px 10px';
+        editBtn.style.fontSize = '13px';
+        editBtn.textContent = 'Edit';
+        editBtn.addEventListener('click', () => openEditScheduleModal(idx));
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn danger';
+        delBtn.style.padding = '7px 10px';
+        delBtn.style.fontSize = '13px';
+        delBtn.textContent = 'Delete';
+        delBtn.addEventListener('click', () => deleteSchedule(idx));
+        actionCell.appendChild(editBtn);
+        actionCell.appendChild(delBtn);
+        tr.appendChild(idxCell);
+        tr.appendChild(timeCell);
+        tr.appendChild(actionCell);
+        body.appendChild(tr);
+      });
+    }
+
+    function mmToHHMM_24(hh12, mm, ampm){
+      let h = hh12 % 12;
+      if(ampm === 'PM') h += 12;
+      return String(h).padStart(2,'0') + ':' + String(mm).padStart(2,'0');
+    }
+
+    function hhmm24To12(hhmm){
+      const norm = normalizeHHMM(hhmm) || '00:00';
+      const [hS, mS] = norm.split(':');
+      const h24 = Number(hS);
+      const m = Number(mS);
+      const ampm = h24 >= 12 ? 'PM' : 'AM';
+      let h12 = h24 % 12;
+      if(h12 === 0) h12 = 12;
+      return {hh12: h12, mm: m, ampm};
+    }
+
+    function setActiveAMPM(ampm){
+      const amBtn = document.getElementById('ampmAM');
+      const pmBtn = document.getElementById('ampmPM');
+      if(!amBtn || !pmBtn) return;
+      if(ampm === 'AM'){
+        amBtn.classList.add('active');
+        pmBtn.classList.remove('active');
+      } else {
+        pmBtn.classList.add('active');
+        amBtn.classList.remove('active');
+      }
+    }
+
+    function showScheduleModal(){ document.getElementById('schedModal').style.display = 'flex'; }
+    function hideScheduleModal(){ document.getElementById('schedModal').style.display = 'none'; }
+
+    function createAMPMButtons(){
+      if(document.getElementById('ampmAM')) return;
+      const wrap = document.getElementById('ampmWrap');
+      if(!wrap) return;
+      wrap.innerHTML = '';
+      const makeBtn = (id, label) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.id = id;
+        b.className = 'ampmBtn';
+        b.textContent = label;
+        return b;
+      };
+      const amBtn = makeBtn('ampmAM','AM');
+      const pmBtn = makeBtn('ampmPM','PM');
+      amBtn.onclick = ()=>{ window.__schedAMPM = 'AM'; setActiveAMPM('AM'); };
+      pmBtn.onclick = ()=>{ window.__schedAMPM = 'PM'; setActiveAMPM('PM'); };
+      wrap.appendChild(amBtn);
+      wrap.appendChild(pmBtn);
+    }
+
+    function openAddScheduleModal(){
+      window.__editingScheduleIndex = null;
+      window.__schedDraftHHMM = '00:00';
+      window.__schedAMPM = 'AM';
+      initScheduleModalDial('00:00');
+      setActiveAMPM('AM');
+      showScheduleModal();
+    }
+
+    function openEditScheduleModal(index){
+      window.__editingScheduleIndex = index;
+      const t = window.__scheduleLastList?.[index] ?? null;
+      if(!t){
+        refreshSchedules();
+        alert('Could not load schedule for editing. Try again.');
+        return;
+      }
+      const parsed = hhmm24To12(t);
+      window.__schedAMPM = parsed.ampm;
+      initScheduleModalDial(t);
+      setActiveAMPM(parsed.ampm);
+      showScheduleModal();
+    }
+
+    let __schedModalDialUI = null;
+    function initScheduleModalDial(hhmm24){
+      const parsed = hhmm24To12(hhmm24);
+      const hh12 = parsed.hh12;
+      const mm = parsed.mm;
+      const host = document.getElementById('schedDialHost');
+      if(!host) return;
+      host.innerHTML = '';
+      const wrap = document.createElement('div');
+      wrap.style.display = 'flex';
+      wrap.style.gap = '14px';
+      wrap.style.alignItems = 'flex-start';
+      wrap.style.justifyContent = 'center';
+
+      const makeSpinner = (label, minV, maxV, pad2, initialV) => {
+        const spinnerWrap = document.createElement('div');
+        spinnerWrap.style.display = 'flex';
+        spinnerWrap.style.flexDirection = 'column';
+        spinnerWrap.style.alignItems = 'center';
+        spinnerWrap.style.gap = '8px';
+        const topLabel = document.createElement('div');
+        topLabel.className = 'small';
+        topLabel.style.fontWeight = '900';
+        topLabel.style.color = '#333';
+        topLabel.textContent = label;
+        const viewport = document.createElement('div');
+        viewport.style.width = '140px';
+        viewport.style.height = '210px';
+        viewport.style.overflowY = 'auto';
+        viewport.style.scrollBehavior = 'smooth';
+        viewport.style.borderRadius = '14px';
+        viewport.style.border = '1px solid #eee';
+        viewport.style.background = '#fafafa';
+        viewport.style.webkitOverflowScrolling = 'touch';
+        viewport.style.position = 'relative';
+        const tick = 28;
+        const centerLine = document.createElement('div');
+        centerLine.style.position = 'absolute';
+        centerLine.style.left = '0';
+        centerLine.style.right = '0';
+        centerLine.style.top = '50%';
+        centerLine.style.transform = 'translateY(-50%)';
+        centerLine.style.height = '2px';
+        centerLine.style.background = '#800000';
+        centerLine.style.pointerEvents = 'none';
+        const list = document.createElement('div');
+        list.style.paddingTop = '105px';
+        list.style.paddingBottom = '105px';
+        const values = [];
+        for(let v=minV; v<=maxV; v++) values.push(v);
+        const REPEAT = 20;
+        const extended = [];
+        for(let k=0;k<REPEAT;k++) extended.push(...values);
+        extended.forEach(v => {
+          const item = document.createElement('div');
+          item.style.height = tick + 'px';
+          item.style.display = 'flex';
+          item.style.alignItems = 'center';
+          item.style.justifyContent = 'center';
+          item.style.fontWeight = '900';
+          item.style.fontSize = '18px';
+          item.style.color = '#222';
+          item.textContent = pad2 ? String(v).padStart(2,'0') : String(v);
+          item.dataset.value = String(v);
+          list.appendChild(item);
+        });
+        viewport.appendChild(centerLine);
+        viewport.appendChild(list);
+        const indexOf = (v) => v - minV;
+        const baseIndex = Math.floor(REPEAT/2) * values.length;
+        const scrollToValue = (v) => {
+          const idx = indexOf(v);
+          viewport.scrollTop = ((baseIndex + idx) * tick);
+        };
+        const readValue = () => {
+          const rawIdx = Math.round(viewport.scrollTop / tick);
+          const rel = rawIdx - baseIndex;
+          const mod = ((rel % values.length) + values.length) % values.length;
+          return values[mod];
+        };
+        requestAnimationFrame(()=>{ scrollToValue(initialV); });
+        let changeHandler = null;
+        const onChange = (fn) => { changeHandler = fn; };
+        let raf = null;
+        viewport.addEventListener('scroll', ()=>{
+          if(raf) cancelAnimationFrame(raf);
+          raf = requestAnimationFrame(()=>{
+            const v = readValue();
+            if(typeof changeHandler === 'function') changeHandler(v);
+          });
+        }, {passive:true});
+        spinnerWrap.appendChild(topLabel);
+        spinnerWrap.appendChild(viewport);
+        return {spinnerWrap, viewport, onChange, readValue, scrollToValue};
+      };
+
+      const hourSpin = makeSpinner('HOUR', 1, 12, false, hh12);
+      const minSpin = makeSpinner('MIN', 0, 59, true, mm);
+      wrap.appendChild(hourSpin.spinnerWrap);
+      wrap.appendChild(minSpin.spinnerWrap);
+      host.appendChild(wrap);
+
+      const syncDraft = () => {
+        const hh = hourSpin.readValue();
+        const mmv = minSpin.readValue();
+        const ampm = window.__schedAMPM || 'AM';
+        const hhmm24 = mmToHHMM_24(hh, mmv, ampm);
+        window.__schedDraftHHMM = hhmm24;
+        const preview = document.getElementById('schedPreview');
+        if(preview) preview.textContent = 'Selected: ' + hhmm24 + ' (' + ampm + ')';
+      };
+      hourSpin.onChange(()=>syncDraft());
+      minSpin.onChange(()=>syncDraft());
+      syncDraft();
+    }
+
+    async function confirmScheduleModalSave(){
+      const index = window.__editingScheduleIndex;
+      const hhmm24 = normalizeHHMM(window.__schedDraftHHMM);
+      if(!hhmm24){ alert('Invalid time selected.'); return; }
+      if(index === null || index === undefined){
+        const res = await fetch('/addSchedule', {
+          method:'POST',
+          headers:{'Content-Type':'application/x-www-form-urlencoded'},
+          body:'sched_time=' + encodeURIComponent(hhmm24)
+        });
+        if(!res.ok){ alert('Add failed'); return; }
+      } else {
+        const res = await fetch('/editSchedule', {
+          method:'POST',
+          headers:{'Content-Type':'application/x-www-form-urlencoded'},
+          body:'index=' + encodeURIComponent(index) + '&sched_time=' + encodeURIComponent(hhmm24)
+        });
+        if(!res.ok){ alert('Edit failed'); return; }
+      }
+      hideScheduleModal();
+      window.__editingScheduleIndex = null;
+      window.__scheduleLastList = null;
+      refreshSchedules();
+    }
+
+    async function deleteSchedule(index){
+      const ok = confirm('Delete schedule?');
+      if(!ok) return;
+      const res = await fetch('/deleteSchedule', {
+        method:'POST',
+        headers:{'Content-Type':'application/x-www-form-urlencoded'},
+        body:'index=' + encodeURIComponent(index)
+      });
+      if(!res.ok){ alert('Delete failed'); return; }
+      window.__editingScheduleIndex = null;
+      refreshSchedules();
+    }
+
+    async function refreshLogs(){
+      const res = await fetch('/backend/logs', {cache:'no-store'});
+      if(!res.ok){ document.getElementById('logs').value='Forbidden'; return; }
+      const text = await res.text();
+      document.getElementById('logs').value = text || '';
+    }
+
+    function triggerUploadLog(){
+      const fileInput = document.getElementById('logUploadFile');
+      if(!fileInput.files || !fileInput.files[0]){ alert('Choose a .txt log file first'); return; }
+      const file = fileInput.files[0];
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const text = reader.result || '';
+        const res = await fetch('/backend/logs/upload', {
+          method: 'POST',
+          headers: {'Content-Type': 'text/plain'},
+          body: text
+        });
+        if(!res.ok){ alert('Upload failed'); return; }
+        alert('Upload successful');
+        refreshLogs();
+      };
+      reader.readAsText(file);
+    }
+
+    async function loadConfig(){
+      const res = await fetch('/api/config', {cache:'no-store'});
+      if(!res.ok) return;
+      const data = await res.json();
+      document.getElementById('ap_name').value = data.ap_ssid || '';
+      document.getElementById('station_ssid').value = data.sta_ssid || '';
+      document.getElementById('station_pass').value = data.sta_pass || '';
+    }
+
+    async function saveNetwork(){
+      const ap = document.getElementById('ap_name').value.trim();
+      const ssid = document.getElementById('station_ssid').value.trim();
+      const pass = document.getElementById('station_pass').value;
+      const msg = document.getElementById('netMsg');
+      msg.textContent = 'Saving...';
+      document.getElementById('syncDot').style.background = '#f0a500';
+      try {
+        const res = await fetch('/saveNetwork', {
+          method:'POST',
+          headers:{'Content-Type':'application/x-www-form-urlencoded'},
+          body:'ap_name=' + encodeURIComponent(ap) + '&station_ssid=' + encodeURIComponent(ssid) + '&station_pass=' + encodeURIComponent(pass)
+        });
+        if(!res.ok){ msg.textContent='Save failed'; return; }
+        const data = await res.json();
+        msg.textContent = data.message || 'Network config saved.';
+        setTimeout(()=>{msg.textContent=''}, 8000);
+        refreshLogs();
+      } catch(e) {
+        msg.textContent = 'Network error during save.';
+      }
+    }
+
+    loadTelemetry();
+    loadConfig();
+    setInterval(loadTelemetry, 5000);
+  </script>
+</body>
+</html>
