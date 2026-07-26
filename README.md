@@ -1,6 +1,6 @@
 # capstone_elem_smart-bell — v1.7
 
-The **latest stable release** of the FCU Smart Bell system.
+The **latest release** of the FCU Smart Bell system.
 
 ## What's New in v1.7
 
