@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FCU Smart Bell - Dashboard</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      background: #eef3fa;
+    }
+
+    .view-section {
+      display: none;
+    }
+
+    .view-section.active {
+      display: block;
+    }
+
+    .sidebar {
+      width: 260px;
+      background: white;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border-right: 1px solid #ddd;
+      position: fixed;
+      height: 100vh;
+    }
+
+    .profile-section {
+      text-align: center;
+      padding: 40px 30px;
+    }
+
+    .profile-section img {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-bottom: 15px;
+      border: 4px solid #0b3b8f;
+    }
+
+    .profile-section h2 {
+      font-size: 22px;
+      color: #0b3b8f;
+      line-height: 1.4;
+    }
+
+    .profile-section h2 span#role-name {
+      font-size: 14px;
+      color: #64748b;
+      display: block;
+      font-weight: normal;
+      margin-top: 4px;
+    }
+
+    .menu {
+      padding: 10px;
+    }
+
+    .menu a {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: #333;
+      padding: 16px 18px;
+      margin-bottom: 10px;
+      border-radius: 12px;
+      transition: 0.3s;
+      font-size: 17px;
+    }
+
+    .menu a:hover {
+      background: #0b3b8f;
+      color: white;
+    }
+
+    .menu .active {
+      background: #0b3b8f;
+      color: white;
+    }
+
+    .logout {
+      padding: 20px;
+    }
+
+    .logout a {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: #e63946;
+      color: white;
+      text-decoration: none;
+      padding: 14px;
+      border-radius: 12px;
+      transition: 0.3s;
+    }
+
+    .logout a:hover {
+      background: #c71f2d;
+    }
+
+    .main-content {
+      margin-left: 260px;
+      width: calc(100% - 260px);
+    }
+
+    .page-title {
+      padding: 30px;
+    }
+
+    .page-title h2 {
+      font-size: 36px;
+      color: #1e293b;
+      margin-bottom: 10px;
+    }
+
+    .page-title p {
+      color: #64748b;
+      font-size: 18px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 20px;
+      padding: 0 30px;
+    }
+
+    .card {
+      background: white;
+      padding: 25px;
+      border-radius: 20px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+    }
+
+    .card i {
+      font-size: 28px;
+      margin-bottom: 15px;
+      color: #0b3b8f;
+    }
+
+    .card h3 {
+      color: #64748b;
+      margin-bottom: 10px;
+      font-size: 18px;
+    }
+
+    .card p {
+      font-size: 24px;
+      font-weight: bold;
+      color: #1e293b;
+    }
+
+    .table-section {
+      margin: 30px;
+      background: white;
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+    }
+
+    .table-section h2 {
+      margin-bottom: 25px;
+      color: #1e293b;
+    }
+
+    .action-panel {
+      margin: 30px;
+      background: white;
+      padding: 24px 30px;
+      border-radius: 20px;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+    }
+
+    .action-panel h2 {
+      margin-bottom: 16px;
+      color: #1e293b;
+    }
+
+    .action-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .danger-btn {
+      background: #e11d48 !important;
+    }
+
+    .danger-btn:hover {
+      background: #be123c !important;
+    }
+
+    .secondary-btn {
+      background: #64748b !important;
+    }
+
+    .secondary-btn:hover {
+      background: #475569 !important;
+    }
+
+    .section-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .message {
+      margin-bottom: 12px;
+      font-size: 14px;
+    }
+
+    .message.success {
+      color: #166534;
+    }
+
+    .message.error {
+      color: #b91c1c;
+    }
+
+    .empty-state {
+      text-align: center;
+      color: #64748b;
+      padding: 20px;
+    }
+
+    .edit-btn, .delete-btn {
+      margin-right: 8px;
+      padding: 8px 12px;
+    }
+
+    .delete-btn {
+      background: #e11d48 !important;
+    }
+
+    .delete-btn:hover {
+      background: #be123c !important;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    thead {
+      background: #f1f5f9;
+    }
+
+    th, td {
+      padding: 16px;
+      text-align: left;
+      border-bottom: 1px solid #ddd;
+    }
+
+    button {
+      background: #0b3b8f;
+      color: white;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: 0.3s;
+      font-size: 14px;
+    }
+
+    button:hover {
+      background: #072d6f;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 13px;
+      font-weight: bold;
+    }
+
+    .status-badge.active {
+      background: #dcfce7;
+      color: #166534;
+    }
+
+    .status-badge.pending {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-weight: 900;
+      font-size: 12px;
+      background: #f1f1f1;
+    }
+    .pill.admin {
+      background: #ffecec;
+      color: #800000;
+    }
+    .pill.staff {
+      background: #e9f3ff;
+      color: #0b4a87;
+    }
+
+    label {
+      font-size: 12px;
+      color: #64748b;
+      font-weight: 700;
+      display: block;
+      margin: 12px 0 6px;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #d6d6d6;
+      border-radius: 8px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: #0b3b8f;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+
+    .network-form {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 16px;
+    }
+
+    .manual-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .manual-card h3 {
+      margin-bottom: 8px;
+      color: #0b3b8f;
+    }
+
+    .manual-list {
+      padding-left: 20px;
+      line-height: 1.8;
+      color: #334155;
+    }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .small {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.35;
+    }
+
+    .muted {
+      color: #64748b;
+    }
+
+    textarea {
+      width: 100%;
+      min-height: 180px;
+      padding: 12px;
+      border: 1px solid #d6d6d6;
+      border-radius: 10px;
+      font-size: 13px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    }
+
+    /* Schedule modal */
+    #schedModal {
+      display: none;
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.35);
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      z-index: 10000;
+    }
+    #schedModal .modal-box {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.25);
+      width: min(620px, 92vw);
+      padding: 18px 18px 14px;
+      border-top: 8px solid #0b3b8f;
+    }
+    .ampmBtn {
+      border: 1px solid #ddd;
+      background: #f7f7f7;
+      border-radius: 12px;
+      padding: 10px 16px;
+      font-weight: 900;
+      cursor: pointer;
+      color: #222;
+    }
+    .ampmBtn.active {
+      background: #0b3b8f;
+      color: #fff;
+      border-color: #0b3b8f;
+    }
+    .spinner-viewport {
+      width: 140px;
+      height: 210px;
+      overflow-y: auto;
+      scroll-behavior: smooth;
+      border-radius: 14px;
+      border: 1px solid #eee;
+      background: #fafafa;
+      -webkit-overflow-scrolling: touch;
+      position: relative;
+    }
+    .spinner-viewport .center-line {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 2px;
+      background: #0b3b8f;
+      pointer-events: none;
+    }
+    .spinner-list {
+      padding-top: 105px;
+      padding-bottom: 105px;
+    }
+    .spinner-list .item {
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 18px;
+      color: #222;
+    }
+
+    @media (max-width: 900px) {
+      .sidebar {
+        width: 100%;
+        height: auto;
+        position: relative;
+      }
+
+      .main-content {
+        margin-left: 0;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div>
+      <div class="profile-section">
+        <img src="pfp.jpg" alt="Profile" />
+        <h2>ADMIN <span id="role-name">Role: ...</span></h2>
+      </div>
+
+      <nav class="menu">
+        <a href="#" class="active" data-view="dashboard-view">
+          <i class="fa-solid fa-gauge"></i>
+          Dashboard
+        </a>
+        <a href="#" data-view="schedule-view">
+          <i class="fa-solid fa-calendar-days"></i>
+          Schedule
+        </a>
+        <a href="#" data-view="user-view">
+          <i class="fa-solid fa-person"></i>
+          User Management
+        </a>
+        <a href="#" data-view="activity-view">
+          <i class="fa-solid fa-clock"></i>
+          Activity Logs
+        </a>
+        <a href="#" data-view="network-view">
+          <i class="fa-solid fa-wifi"></i>
+          Network Settings
+        </a>
+        <a href="#" data-view="manual-view">
+          <i class="fa-solid fa-hand"></i>
+          Manual
+        </a>
+      </nav>
+    </div>
+
+    <div class="logout">
+      <a href="#" id="logout-link">
+        <i class="fa-solid fa-right-from-bracket"></i>
+        Sign Out
+      </a>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <!-- ========== DASHBOARD VIEW ========== -->
+    <section class="view-section active" id="dashboard-view">
+      <section class="page-title">
+        <h2>Smart School Bell Automation System</h2>
+        <p>FCU Elementary Department – Web Dashboard</p>
+      </section>
+
+      <section class="cards">
+        <div class="card">
+          <i class="fa-regular fa-clock"></i>
+          <h3>Device Time</h3>
+          <p id="current-time">--</p>
+        </div>
+        <div class="card">
+          <i class="fa-regular fa-bell"></i>
+          <h3>Next Bell</h3>
+          <p id="next-bell">--</p>
+        </div>
+        <div class="card">
+          <i class="fa-solid fa-signal"></i>
+          <h3>Network Status</h3>
+          <p id="network-status">--</p>
+        </div>
+        <div class="card">
+          <i class="fa-solid fa-wifi"></i>
+          <h3>Connected SSID</h3>
+          <p id="connected-ssid">--</p>
+        </div>
+      </section>
+
+      <section class="action-panel">
+        <h2>System Controls</h2>
+        <div class="action-buttons">
+          <button type="button" id="manual-override-btn">Manual Override</button>
+          <button type="button" id="emergency-btn" class="danger-btn">Emergency Detection</button>
+          <button type="button" id="ring-bell-btn">Ring Bell (3s)</button>
+        </div>
+        <p id="action-message" class="message"></p>
+      </section>
+
+      <section class="table-section">
+        <div class="section-heading">
+          <h2>Bell Schedule</h2>
+          <button id="add-schedule-btn" type="button">Add Schedule</button>
+        </div>
+        <p id="schedule-message" class="message"></p>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Time</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="schedule-body"></tbody>
+        </table>
+      </section>
+    </section>
+
+    <!-- ========== SCHEDULE VIEW ========== -->
+    <section class="view-section" id="schedule-view">
+      <section class="page-title">
+        <h2>Bell Schedule</h2>
+        <p>View and manage class transition times</p>
+      </section>
+
+      <section class="cards">
+        <div class="card">
+          <i class="fa-regular fa-clock"></i>
+          <h3>Next Bell</h3>
+          <p id="schedule-next-bell">--</p>
+        </div>
+        <div class="card">
+          <i class="fa-solid fa-list-ol"></i>
+          <h3>Scheduled Events</h3>
+          <p id="schedule-count">0</p>
+        </div>
+      </section>
+
+      <section class="table-section">
+        <h2>Daily Bell Timetable</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody id="schedule-list-body"></tbody>
+        </table>
+      </section>
+    </section>
+
+    <!-- ========== USER MANAGEMENT VIEW ========== -->
+    <section class="view-section" id="user-view">
+      <section class="page-title">
+        <h2>User Management</h2>
+        <p>Manage staff accounts and access permissions</p>
+      </section>
+
+      <section class="cards">
+        <div class="card">
+          <i class="fa-solid fa-users"></i>
+          <h3>Total Users</h3>
+          <p>12</p>
+        </div>
+        <div class="card">
+          <i class="fa-solid fa-user-shield"></i>
+          <h3>Admin Accounts</h3>
+          <p>3</p>
+        </div>
+        <div class="card">
+          <i class="fa-solid fa-circle-check"></i>
+          <h3>Active Users</h3>
+          <p>10</p>
+        </div>
+      </section>
+
+      <section class="table-section">
+        <h2>Account Overview</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Last Login</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Maria Santos</td>
+              <td>Administrator</td>
+              <td><span class="status-badge active">Active</span></td>
+              <td>Today, 07:20 AM</td>
+              <td><button>Edit</button></td>
+            </tr>
+            <tr>
+              <td>John Cruz</td>
+              <td>Staff</td>
+              <td><span class="status-badge active">Active</span></td>
+              <td>Yesterday, 04:15 PM</td>
+              <td><button>Edit</button></td>
+            </tr>
+            <tr>
+              <td>Rosa Dela Vega</td>
+              <td>Viewer</td>
+              <td><span class="status-badge pending">Pending</span></td>
+              <td>Never</td>
+              <td><button>Approve</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </section>
+
+    <!-- ========== ACTIVITY LOGS VIEW ========== -->
+    <section class="view-section" id="activity-view">
+      <section class="page-title">
+        <h2>Activity Logs</h2>
+        <p>Monitor recent system events and admin actions</p>
+      </section>
+
+      <section class="table-section">
+        <div class="section-heading">
+          <h2>Security Logs</h2>
+          <div class="row">
+            <button id="refresh-logs-btn" type="button">Refresh Logs</button>
+          </div>
+        </div>
+        <textarea id="logs" readonly></textarea>
+        <div class="row" style="margin-top:12px;gap:10px;">
+          <button id="upload-log-btn" type="button">Upload Logs</button>
+          <input id="logUploadFile" type="file" accept="text/plain" style="width:auto;padding:8px;" />
+        </div>
+      </section>
+    </section>
+
+    <!-- ========== NETWORK SETTINGS VIEW ========== -->
+    <section class="view-section" id="network-view">
+      <section class="page-title">
+        <h2>Network Settings</h2>
+        <p>Configure WiFi access point and station connection</p>
+      </section>
+
+      <section class="table-section">
+        <div class="network-form">
+          <label for="ap_name">AP SSID (Access Point Name)</label>
+          <input id="ap_name" type="text" placeholder="e.g., FCU_Secure_Bell" />
+
+          <label for="station_ssid">Station SSID (WiFi to connect to)</label>
+          <input id="station_ssid" type="text" placeholder="e.g., MyWiFi" />
+
+          <label for="station_pass">Station Password</label>
+          <input id="station_pass" type="password" placeholder="WiFi password" />
+
+          <div class="row" style="margin-top:16px;">
+            <button id="save-network-btn" type="button">Save &amp; Sync Time</button>
+            <span id="netMsg" class="small"></span>
+          </div>
+          <div class="small" style="margin-top:8px;">This updates /data/config.txt on SPIFFS.</div>
+        </div>
+      </section>
+    </section>
+
+    <!-- ========== MANUAL VIEW ========== -->
+    <section class="view-section" id="manual-view">
+      <section class="page-title">
+        <h2>System Manual</h2>
+        <p>Quick guide for daily operation and support</p>
+      </section>
+
+      <section class="table-section">
+        <h2>How to Use the System</h2>
+        <ol class="manual-list">
+          <li>Sign in with your assigned username and password.</li>
+          <li>Open the Schedule page to review and edit bell times.</li>
+          <li>Use User Management to add or update staff accounts.</li>
+          <li>Check Activity Logs for recent system events and alerts.</li>
+          <li>Run a manual bell test when needed from the control panel.</li>
+        </ol>
+      </section>
+
+      <section class="table-section">
+        <h2>Frequently Asked Questions</h2>
+        <div class="manual-card">
+          <h3>Can I change the bell audio?</h3>
+          <p>Yes. Open the Schedule page and select the bell entry you want to update.</p>
+        </div>
+        <div class="manual-card">
+          <h3>What should I do if the system shows a warning?</h3>
+          <p>Check the Activity Logs and confirm the system status before taking action.</p>
+        </div>
+      </section>
+
+      <section class="table-section">
+        <h2>API Reference</h2>
+        <div class="small">
+          <b>Endpoints used:</b>
+          <ul style="margin-left:20px;line-height:1.8;">
+            <li>/api/telemetry</li>
+            <li>/ring</li>
+            <li>/api/schedules</li>
+            <li>/addSchedule</li>
+            <li>/editSchedule</li>
+            <li>/deleteSchedule</li>
+            <li>/backend/logs</li>
+            <li>/backend/logs/upload</li>
+            <li>/saveNetwork</li>
+            <li>/api/config</li>
+            <li>/logout</li>
+          </ul>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <!-- Schedule Modal -->
+  <div id="schedModal">
+    <div class="modal-box">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+        <div>
+          <h3 id="schedModalTitle" style="margin:0;">Schedule Time</h3>
+          <div id="schedPreview" class="small muted" style="margin-top:4px;">Selected: 00:00 (AM)</div>
+        </div>
+        <button type="button" class="secondary-btn" style="padding:8px 12px;" onclick="hideScheduleModal()">Close</button>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap;">
+        <div id="schedDialHost" style="flex:1;min-width:260px;"></div>
+        <div style="flex:0;min-width:160px;">
+          <div class="small" style="font-weight:900;color:#333;margin-bottom:8px;">AM / PM</div>
+          <div id="ampmWrap" style="display:flex;gap:10px;flex-wrap:wrap;"></div>
+          <div class="small muted" style="margin-top:12px;">Scroll spinners to choose time.</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end;">
+        <button type="button" class="secondary-btn" onclick="hideScheduleModal()">Cancel</button>
+        <button type="button" onclick="confirmScheduleModalSave()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const navLinks = document.querySelectorAll('.menu a[data-view]');
+    const scheduleBody = document.getElementById('schedule-body');
+    const scheduleListBody = document.getElementById('schedule-list-body');
+    const currentTimeDisplay = document.getElementById('current-time');
+    const nextBellDisplay = document.getElementById('next-bell');
+    const scheduleNextBellDisplay = document.getElementById('schedule-next-bell');
+    const networkStatusDisplay = document.getElementById('network-status');
+    const connectedSsidDisplay = document.getElementById('connected-ssid');
+    const actionMessage = document.getElementById('action-message');
+    const scheduleMessage = document.getElementById('schedule-message');
+    const scheduleCountDisplay = document.getElementById('schedule-count');
+    const logsTextarea = document.getElementById('logs');
+    const roleNameEl = document.getElementById('role-name');
+
+    let __clockInterval = null;
+    let __scheduleLastList = [];
+    window.__schedDraftHHMM = '00:00';
+    window.__schedAMPM = 'AM';
+    window.__editingScheduleIndex = null;
+
+    // ========== VIEW NAVIGATION ==========
+    function showView(viewId) {
+      document.querySelectorAll('.view-section').forEach(function(section) {
+        section.classList.toggle('active', section.id === viewId);
+      });
+      navLinks.forEach(function(link) {
+        link.classList.toggle('active', link.getAttribute('data-view') === viewId);
+      });
+    }
+
+    navLinks.forEach(function(link) {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        showView(link.getAttribute('data-view'));
+      });
+    });
+
+    // ========== LOGOUT ==========
+    document.getElementById('logout-link').addEventListener('click', function(e) {
+      e.preventDefault();
+      window.location.href = '/logout';
+    });
+
+    // ========== TELEMETRY ==========
+    function formatDate(d) {
+      if (!d) return '-';
+      var Y = d.getUTCFullYear();
+      var M = String(d.getUTCMonth() + 1).padStart(2, '0');
+      var D = String(d.getUTCDate()).padStart(2, '0');
+      var h = String(d.getUTCHours()).padStart(2, '0');
+      var m = String(d.getUTCMinutes()).padStart(2, '0');
+      var s = String(d.getUTCSeconds()).padStart(2, '0');
+      return Y + '-' + M + '-' + D + ' ' + h + ':' + m + ':' + s;
+    }
+
+    function parseServerTime(timeStr) {
+      if (!timeStr || timeStr === '-') return null;
+      var match = timeStr.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
+      if (!match) return null;
+      return new Date(match[1].replace(' ', 'T') + 'Z');
+    }
+
+    function extractTimeSource(timeStr) {
+      if (!timeStr) return '';
+      var m = timeStr.match(/\((.*?)\)$/);
+      return m ? ' (' + m[1] + ')' : '';
+    }
+
+    function startLocalClock() {
+      if (__clockInterval) clearInterval(__clockInterval);
+      __clockInterval = setInterval(function() {
+        if (window.__deviceTime) {
+          window.__deviceTime.setUTCSeconds(window.__deviceTime.getUTCSeconds() + 1);
+          currentTimeDisplay.textContent = formatDate(window.__deviceTime) + window.__deviceTimeSource;
+        }
+      }, 1000);
+    }
+
+    async function loadTelemetry() {
+      try {
+        var res = await fetch('/api/telemetry', { cache: 'no-store' });
+        if (!res.ok) {
+          window.location.href = '/';
+          return;
+        }
+        var data = await res.json();
+
+        // Time display
+        var parsed = parseServerTime(data.time);
+        if (parsed) {
+          window.__deviceTime = parsed;
+          window.__deviceTimeSource = extractTimeSource(data.time);
+          currentTimeDisplay.textContent = data.time;
+          if (!__clockInterval) startLocalClock();
+        } else {
+          currentTimeDisplay.textContent = data.time || '-';
+        }
+
+        // Status & SSID
+        networkStatusDisplay.textContent = data.status || '-';
+        connectedSsidDisplay.textContent = data.ssid || '-';
+
+        // Role display
+        var role = data.role || 'Guest';
+        roleNameEl.textContent = 'Role: ' + role;
+
+        // Determine access level
+        if (role === 'SuperAdmin' || role === 'Admin' || role === 'User') {
+          // has access
+        } else {
+          window.location.href = '/';
+        }
+
+        // Update schedules periodically
+        if (role === 'SuperAdmin' || role === 'Admin' || role === 'User') {
+          refreshSchedules();
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // ========== RING BELL ==========
+    async function ringBell() {
+      var msg = actionMessage;
+      msg.textContent = 'Dispatching...';
+      msg.className = 'message';
+      try {
+        var res = await fetch('/ring', { method: 'GET' });
+        if (!res.ok) {
+          msg.textContent = 'Failed (not authorized?)';
+          msg.className = 'message error';
+          return;
+        }
+        msg.textContent = 'Bell Dispatched.';
+        msg.className = 'message success';
+        setTimeout(function() { msg.textContent = ''; }, 3000);
+      } catch (e) {
+        msg.textContent = 'Network error.';
+        msg.className = 'message error';
+      }
+    }
+
+    document.getElementById('ring-bell-btn').addEventListener('click', ringBell);
+
+    // ========== SCHEDULE MANAGEMENT ==========
+    function normalizeHHMM(input) {
+      if (!input) return '';
+      var v = String(input).trim();
+      var m = v.match(/^\s*(\d{1,2})\s*:\s*(\d{2})\s*$/);
+      if (!m) return '';
+      var hh = Number(m[1]);
+      var mm = Number(m[2]);
+      if (Number.isNaN(hh) || Number.isNaN(mm)) return '';
+      if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return '';
+      return String(hh).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+    }
+
+    async function refreshSchedules() {
+      try {
+        var res = await fetch('/api/schedules', { cache: 'no-store' });
+        if (!res.ok) return;
+        var list = await res.json();
+        __scheduleLastList = list;
+        renderScheduleTables(list);
+      } catch (e) {}
+    }
+
+    function renderScheduleTables(list) {
+      scheduleBody.innerHTML = '';
+      scheduleListBody.innerHTML = '';
+
+      if (!list || list.length === 0) {
+        scheduleBody.innerHTML = '<tr><td colspan="3" class="empty-state">No bell schedules yet.</td></tr>';
+        scheduleListBody.innerHTML = '<tr><td colspan="2" class="empty-state">No bell schedules yet.</td></tr>';
+        nextBellDisplay.textContent = 'No schedule set';
+        scheduleNextBellDisplay.textContent = 'No schedule set';
+        scheduleCountDisplay.textContent = '0';
+        return;
+      }
+
+      list.forEach(function(t, idx) {
+        // Dashboard table with edit/delete
+        var tr = document.createElement('tr');
+        var idxCell = document.createElement('td');
+        idxCell.textContent = idx;
+        var timeCell = document.createElement('td');
+        timeCell.textContent = t;
+        var actionCell = document.createElement('td');
+        actionCell.style.display = 'flex';
+        actionCell.style.gap = '8px';
+        actionCell.style.flexWrap = 'wrap';
+
+        var editBtn = document.createElement('button');
+        editBtn.className = 'secondary-btn';
+        editBtn.style.padding = '7px 10px';
+        editBtn.style.fontSize = '13px';
+        editBtn.textContent = 'Edit';
+        editBtn.addEventListener('click', function() { openEditScheduleModal(idx); });
+
+        var delBtn = document.createElement('button');
+        delBtn.className = 'delete-btn';
+        delBtn.style.padding = '7px 10px';
+        delBtn.style.fontSize = '13px';
+        delBtn.textContent = 'Delete';
+        delBtn.addEventListener('click', function() { deleteSchedule(idx); });
+
+        actionCell.appendChild(editBtn);
+        actionCell.appendChild(delBtn);
+        tr.appendChild(idxCell);
+        tr.appendChild(timeCell);
+        tr.appendChild(actionCell);
+        scheduleBody.appendChild(tr);
+
+        // Schedule view (read-only)
+        var tr2 = document.createElement('tr');
+        var idxCell2 = document.createElement('td');
+        idxCell2.textContent = idx;
+        var timeCell2 = document.createElement('td');
+        timeCell2.textContent = t;
+        tr2.appendChild(idxCell2);
+        tr2.appendChild(timeCell2);
+        scheduleListBody.appendChild(tr2);
+      });
+
+      // Update next bell
+      var next = list[0];
+      nextBellDisplay.textContent = next;
+      scheduleNextBellDisplay.textContent = next;
+      scheduleCountDisplay.textContent = list.length;
+    }
+
+    async function deleteSchedule(index) {
+      var ok = confirm('Delete schedule?');
+      if (!ok) return;
+      try {
+        var res = await fetch('/deleteSchedule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'index=' + encodeURIComponent(index)
+        });
+        if (!res.ok) {
+          scheduleMessage.textContent = 'Delete failed';
+          scheduleMessage.className = 'message error';
+          return;
+        }
+        scheduleMessage.textContent = 'Schedule deleted.';
+        scheduleMessage.className = 'message success';
+        window.__editingScheduleIndex = null;
+        refreshSchedules();
+      } catch (e) {
+        scheduleMessage.textContent = 'Network error.';
+        scheduleMessage.className = 'message error';
+      }
+    }
+
+    // ========== SCHEDULE MODAL (Time Dial) ==========
+    function showScheduleModal() { document.getElementById('schedModal').style.display = 'flex'; }
+    function hideScheduleModal() { document.getElementById('schedModal').style.display = 'none'; }
+
+    function createAMPMButtons() {
+      if (document.getElementById('ampmAM')) return;
+      var wrap = document.getElementById('ampmWrap');
+      if (!wrap) return;
+      wrap.innerHTML = '';
+      var amBtn = document.createElement('button');
+      amBtn.type = 'button';
+      amBtn.id = 'ampmAM';
+      amBtn.className = 'ampmBtn';
+      amBtn.textContent = 'AM';
+      amBtn.onclick = function() { window.__schedAMPM = 'AM'; setActiveAMPM('AM'); };
+      var pmBtn = document.createElement('button');
+      pmBtn.type = 'button';
+      pmBtn.id = 'ampmPM';
+      pmBtn.className = 'ampmBtn';
+      pmBtn.textContent = 'PM';
+      pmBtn.onclick = function() { window.__schedAMPM = 'PM'; setActiveAMPM('PM'); };
+      wrap.appendChild(amBtn);
+      wrap.appendChild(pmBtn);
+    }
+
+    function setActiveAMPM(ampm) {
+      var amBtn = document.getElementById('ampmAM');
+      var pmBtn = document.getElementById('ampmPM');
+      if (!amBtn || !pmBtn) return;
+      if (ampm === 'AM') { amBtn.classList.add('active'); pmBtn.classList.remove('active'); }
+      else { pmBtn.classList.add('active'); amBtn.classList.remove('active'); }
+    }
+
+    function mmToHHMM_24(hh12, mm, ampm) {
+      var h = hh12 % 12;
+      if (ampm === 'PM') h += 12;
+      return String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0');
+    }
+
+    function hhmm24To12(hhmm) {
+      var norm = normalizeHHMM(hhmm) || '00:00';
+      var parts = norm.split(':');
+      var h24 = Number(parts[0]);
+      var m = Number(parts[1]);
+      var ampm = h24 >= 12 ? 'PM' : 'AM';
+      var h12 = h24 % 12;
+      if (h12 === 0) h12 = 12;
+      return { hh12: h12, mm: m, ampm: ampm };
+    }
+
+    function openAddScheduleModal() {
+      window.__editingScheduleIndex = null;
+      window.__schedDraftHHMM = '00:00';
+      window.__schedAMPM = 'AM';
+      initScheduleModalDial('00:00');
+      setActiveAMPM('AM');
+      showScheduleModal();
+    }
+
+    function openEditScheduleModal(index) {
+      window.__editingScheduleIndex = index;
+      var t = __scheduleLastList[index] || null;
+      if (!t) {
+        refreshSchedules();
+        alert('Could not load schedule for editing. Try again.');
+        return;
+      }
+      var parsed = hhmm24To12(t);
+      window.__schedAMPM = parsed.ampm;
+      initScheduleModalDial(t);
+      setActiveAMPM(parsed.ampm);
+      showScheduleModal();
+    }
+
+    function initScheduleModalDial(hhmm24) {
+      var parsed = hhmm24To12(hhmm24);
+      var hh12 = parsed.hh12;
+      var mm = parsed.mm;
+      var host = document.getElementById('schedDialHost');
+      if (!host) return;
+      host.innerHTML = '';
+
+      var wrap = document.createElement('div');
+      wrap.style.display = 'flex';
+      wrap.style.gap = '14px';
+      wrap.style.alignItems = 'flex-start';
+      wrap.style.justifyContent = 'center';
+
+      function makeSpinner(label, minV, maxV, pad2, initialV) {
+        var spinnerWrap = document.createElement('div');
+        spinnerWrap.style.display = 'flex';
+        spinnerWrap.style.flexDirection = 'column';
+        spinnerWrap.style.alignItems = 'center';
+        spinnerWrap.style.gap = '8px';
+
+        var topLabel = document.createElement('div');
+        topLabel.className = 'small';
+        topLabel.style.fontWeight = '900';
+        topLabel.style.color = '#333';
+        topLabel.textContent = label;
+
+        var viewport = document.createElement('div');
+        viewport.className = 'spinner-viewport';
+
+        var centerLine = document.createElement('div');
+        centerLine.className = 'center-line';
+
+        var list = document.createElement('div');
+        list.className = 'spinner-list';
+
+        var values = [];
+        for (var v = minV; v <= maxV; v++) values.push(v);
+        var REPEAT = 20;
+        var extended = [];
+        for (var k = 0; k < REPEAT; k++) extended = extended.concat(values);
+
+        extended.forEach(function(v) {
+          var item = document.createElement('div');
+          item.className = 'item';
+          item.textContent = pad2 ? String(v).padStart(2, '0') : String(v);
+          item.dataset.value = String(v);
+          list.appendChild(item);
+        });
+
+        viewport.appendChild(centerLine);
+        viewport.appendChild(list);
+
+        var baseIndex = Math.floor(REPEAT / 2) * values.length;
+        var tick = 28;
+
+        function scrollToValue(v) {
+          var idx = v - minV;
+          viewport.scrollTop = (baseIndex + idx) * tick;
+        }
+
+        function readValue() {
+          var rawIdx = Math.round(viewport.scrollTop / tick);
+          var rel = rawIdx - baseIndex;
+          var mod = ((rel % values.length) + values.length) % values.length;
+          return values[mod];
+        }
+
+        requestAnimationFrame(function() { scrollToValue(initialV); });
+
+        var changeHandler = null;
+        function onChange(fn) { changeHandler = fn; }
+
+        var raf = null;
+        viewport.addEventListener('scroll', function() {
+          if (raf) cancelAnimationFrame(raf);
+          raf = requestAnimationFrame(function() {
+            var val = readValue();
+            if (typeof changeHandler === 'function') changeHandler(val);
+          });
+        }, { passive: true });
+
+        spinnerWrap.appendChild(topLabel);
+        spinnerWrap.appendChild(viewport);
+
+        return { spinnerWrap: spinnerWrap, onChange: onChange, readValue: readValue, scrollToValue: scrollToValue };
+      }
+
+      var hourSpin = makeSpinner('HOUR', 1, 12, false, hh12);
+      var minSpin = makeSpinner('MIN', 0, 59, true, mm);
+
+      wrap.appendChild(hourSpin.spinnerWrap);
+      wrap.appendChild(minSpin.spinnerWrap);
+      host.appendChild(wrap);
+
+      function syncDraft() {
+        var hh = hourSpin.readValue();
+        var mmv = minSpin.readValue();
+        var ampm = window.__schedAMPM || 'AM';
+        var hhmm24val = mmToHHMM_24(hh, mmv, ampm);
+        window.__schedDraftHHMM = hhmm24val;
+        var preview = document.getElementById('schedPreview');
+        if (preview) preview.textContent = 'Selected: ' + hhmm24val + ' (' + ampm + ')';
+      }
+      hourSpin.onChange(function() { syncDraft(); });
+      minSpin.onChange(function() { syncDraft(); });
+      syncDraft();
+    }
+
+    async function confirmScheduleModalSave() {
+      var index = window.__editingScheduleIndex;
+      var hhmm24 = normalizeHHMM(window.__schedDraftHHMM);
+      if (!hhmm24) { alert('Invalid time selected.'); return; }
+      try {
+        if (index === null || index === undefined) {
+          var res = await fetch('/addSchedule', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'sched_time=' + encodeURIComponent(hhmm24)
+          });
+          if (!res.ok) { alert('Add failed'); return; }
+          scheduleMessage.textContent = 'Schedule added.';
+          scheduleMessage.className = 'message success';
+        } else {
+          var res = await fetch('/editSchedule', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'index=' + encodeURIComponent(index) + '&sched_time=' + encodeURIComponent(hhmm24)
+          });
+          if (!res.ok) { alert('Edit failed'); return; }
+          scheduleMessage.textContent = 'Schedule updated.';
+          scheduleMessage.className = 'message success';
+        }
+        hideScheduleModal();
+        window.__editingScheduleIndex = null;
+        __scheduleLastList = null;
+        refreshSchedules();
+      } catch (e) {
+        scheduleMessage.textContent = 'Network error.';
+        scheduleMessage.className = 'message error';
+      }
+    }
+
+    document.getElementById('add-schedule-btn').addEventListener('click', function() {
+      openAddScheduleModal();
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') hideScheduleModal();
+    });
+
+    // ========== ACTIVITY LOGS ==========
+    async function refreshLogs() {
+      try {
+        var res = await fetch('/backend/logs', { cache: 'no-store' });
+        if (!res.ok) { logsTextarea.value = 'Forbidden'; return; }
+        var text = await res.text();
+        logsTextarea.value = text || '';
+      } catch (e) {
+        logsTextarea.value = 'Error loading logs.';
+      }
+    }
+
+    document.getElementById('refresh-logs-btn').addEventListener('click', refreshLogs);
+
+    document.getElementById('upload-log-btn').addEventListener('click', function() {
+      var fileInput = document.getElementById('logUploadFile');
+      if (!fileInput.files || !fileInput.files[0]) { alert('Choose a .txt log file first'); return; }
+      var file = fileInput.files[0];
+      var reader = new FileReader();
+      reader.onload = async function() {
+        var text = reader.result || '';
+        try {
+          var res = await fetch('/backend/logs/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: text
+          });
+          if (!res.ok) { alert('Upload failed'); return; }
+          alert('Upload successful');
+          refreshLogs();
+        } catch (e) {
+          alert('Network error during upload.');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    // ========== NETWORK SETTINGS ==========
+    async function loadConfig() {
+      try {
+        var res = await fetch('/api/config', { cache: 'no-store' });
+        if (!res.ok) return;
+        var data = await res.json();
+        document.getElementById('ap_name').value = data.ap_ssid || '';
+        document.getElementById('station_ssid').value = data.sta_ssid || '';
+        document.getElementById('station_pass').value = data.sta_pass || '';
+      } catch (e) {}
+    }
+
+    async function saveNetwork() {
+      var ap = document.getElementById('ap_name').value.trim();
+      var ssid = document.getElementById('station_ssid').value.trim();
+      var pass = document.getElementById('station_pass').value;
+      var msg = document.getElementById('netMsg');
+      msg.textContent = 'Saving...';
+      try {
+        var res = await fetch('/saveNetwork', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'ap_name=' + encodeURIComponent(ap) + '&station_ssid=' + encodeURIComponent(ssid) + '&station_pass=' + encodeURIComponent(pass)
+        });
+        if (!res.ok) { msg.textContent = 'Save failed'; return; }
+        var data = await res.json();
+        msg.textContent = data.message || 'Network config saved.';
+        setTimeout(function() { msg.textContent = ''; }, 8000);
+      } catch (e) {
+        msg.textContent = 'Network error during save.';
+      }
+    }
+
+    document.getElementById('save-network-btn').addEventListener('click', saveNetwork);
+
+    // ========== SYSTEM CONTROLS (Dashboard) ==========
+    document.getElementById('manual-override-btn').addEventListener('click', function() {
+      actionMessage.textContent = 'Manual override triggered.';
+      actionMessage.className = 'message success';
+    });
+
+    document.getElementById('emergency-btn').addEventListener('click', function() {
+      actionMessage.textContent = 'Emergency alert mode activated.';
+      actionMessage.className = 'message success';
+    });
+
+    // ========== ACTIVITY LOGS ON VIEW ACTIVATION ==========
+    // Ensure logs are fetched immediately when user clicks Activity Logs
+    document.querySelector('a[data-view="activity-view"]').addEventListener('click', function() {
+      refreshLogs();
+    });
+
+    // ========== INIT ==========
+    createAMPMButtons();
+    loadTelemetry();
+    loadConfig();
+    refreshLogs(); // Fetch logs immediately on page load, not after 15s
+    setInterval(loadTelemetry, 5000);
+    setInterval(refreshLogs, 15000);
+  </script>
+</body>
+</html>
+

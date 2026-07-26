@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FCU Smart Bell - Login</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    body {
+      background: #eef3fa;
+    }
+
+    .login-page {
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      position: relative;
+      background: #0b2c75;
+    }
+
+    .background {
+      position: absolute;
+      width: 100%;
+      height: 80%;
+      background: url(building.jpg);
+      background-size: cover;
+      opacity: 0.95;
+    }
+
+    .login-container {
+      position: relative;
+      width: 630px;
+      background: #f5f5f5;
+      padding: 40px;
+      border-radius: 4px;
+      z-index: 10;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .logo-section {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .logo-section img {
+      width: 250px;
+      max-width: 100%;
+    }
+
+    .portal-title {
+      background: #ff4d00;
+      color: white;
+      font-size: 32px;
+      font-weight: bold;
+      text-align: center;
+      padding: 18px;
+      border-radius: 0 0 80px 0;
+      margin-bottom: 40px;
+    }
+
+    .input-group {
+      margin-bottom: 20px;
+    }
+
+    .input-group input {
+      width: 100%;
+      padding: 16px;
+      border: 1px solid #d6d6d6;
+      background: white;
+      font-size: 18px;
+      border-radius: 3px;
+      outline: none;
+    }
+
+    .input-group input:focus {
+      border-color: #0b2c75;
+    }
+
+    .captcha-text {
+      text-align: center;
+      color: #666;
+      margin: 25px 0;
+      font-size: 15px;
+    }
+
+    .login-btn {
+      width: 100%;
+      background: #13278f;
+      color: white;
+      border: none;
+      padding: 16px;
+      font-size: 22px;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 3px;
+      transition: 0.3s;
+    }
+
+    .login-btn:hover {
+      background: #0b1f6d;
+    }
+
+    .footer-text {
+      text-align: center;
+      margin-top: 35px;
+      color: #444;
+      font-size: 18px;
+    }
+
+    .footer-text span {
+      color: #ff3d3d;
+      cursor: pointer;
+    }
+
+    .error-msg {
+      color: #b00020;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 12px;
+      min-height: 24px;
+      font-size: 15px;
+    }
+
+    @media (max-width: 900px) {
+      .login-container {
+        width: 95%;
+        padding: 25px;
+      }
+
+      .portal-title {
+        font-size: 24px;
+      }
+    }
+
+    /* Modal error popup */
+    .modal {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      z-index: 9999;
+    }
+    .modal .box {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.25);
+      width: min(460px, 92vw);
+      padding: 18px 18px 14px;
+      border-top: 8px solid #b00020;
+    }
+    .modal h3 { margin: 0 0 6px; font-size: 16px; }
+    .modal p { margin: 0; color: #333; font-size: 14px; }
+    .modal .actions { margin-top: 14px; text-align: right; }
+    .modal .ok {
+      background: #b00020;
+      color: #fff;
+      border: 0;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-weight: 900;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <section class="login-page" id="login-page">
+    <div class="background"></div>
+    <div class="login-container">
+      <div class="logo-section">
+        <img src="FCU.jpg" alt="Logo" />
+      </div>
+      <div class="portal-title">
+        FCU ELEMENTARY
+        <center>SCHOOL BELL SYSTEM</center>
+      </div>
+      <div class="error-msg" id="error-msg"></div>
+      <form id="login-form" autocomplete="off">
+        <div class="input-group">
+          <input type="text" id="username" name="username" placeholder="Username" required />
+        </div>
+        <div class="input-group">
+          <input type="password" id="password" name="password" placeholder="Password" required />
+        </div>
+        <div class="captcha-text">Protected by reCAPTCHA v3</div>
+        <button type="submit" class="login-btn">SIGN IN</button>
+      </form>
+      <div class="footer-text">
+        Don't have an account?
+        <span>Sign Here</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Modal error popup (for backend error query param) -->
+  <div id="errModal" class="modal" style="display:none;">
+    <div class="box">
+      <h3>Login failed</h3>
+      <p id="errModalMsg"></p>
+      <div class="actions">
+        <button class="ok" type="button" onclick="hideModal(true)">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showModal(msg) {
+      const errEl = document.getElementById('error-msg');
+      errEl.textContent = msg;
+
+      document.getElementById('errModalMsg').textContent = msg;
+      document.getElementById('errModal').style.display = 'flex';
+    }
+
+    function hideModal(reloadPage) {
+      document.getElementById('errModal').style.display = 'none';
+      if (reloadPage) {
+        const errEl = document.getElementById('error-msg');
+        errEl.textContent = '';
+      }
+    }
+
+    // Intercept login form with fetch() so we stay on the styled page
+    document.getElementById('login-form').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+
+      if (!username || !password) {
+        showModal('Please enter username and password.');
+        return;
+      }
+
+      try {
+        const res = await fetch('/handleLogin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password)
+        });
+
+        // 401 = invalid credentials → show modal on the styled page
+        if (res.status === 401) {
+          showModal('Invalid username or password');
+          return;
+        }
+
+        // 423 = locked out (too many failed attempts)
+        if (res.status === 423) {
+          showModal('Account temporarily locked. Please try again later.');
+          return;
+        }
+
+        // 303 = success redirect → follow the redirect
+        if (res.status === 303) {
+          const location = res.headers.get('Location');
+          window.location.href = location || '/';
+          return;
+        }
+
+        // Any other status → show generic error
+        if (!res.ok) {
+          showModal('Login failed. Please try again.');
+          return;
+        }
+
+        // Fallback: redirect to root
+        window.location.href = '/';
+      } catch (err) {
+        showModal('Network error. Please check your connection.');
+      }
+    });
+  </script>
+</body>
+</html>
+
