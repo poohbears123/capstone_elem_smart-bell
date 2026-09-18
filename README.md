@@ -1,96 +1,167 @@
-# capstone_elem_smart-bell — v1.7
+```markdown
+# capstone_elem_smart-bell — Migration & Evolution Report (v1.7 → v2.1.0)
 
-The **latest release** of the FCU Smart Bell system.
+A comprehensive breakdown of the architectural rewrite, feature transitions, bug fixes, and system improvements across the development phases of the FCU Elementary Smart Bell system.
 
-## What's New in v1.7
+---
 
-### I2S Audio via MAX98357A Amplifier
-Replaced the simple GPIO-based bell mechanism with a full I2S audio driver for the **MAX98357A Class D amplifier**. The system now generates audio tones through an external speaker using:
-- **BCLK** (GPIO 26), **LRC** (GPIO 27), **DIN** (GPIO 25)
-- 16-bit, 16kHz mono audio playback
-- `i2sPlayTone()` — plays a configurable frequency tone for a given duration
-- `triggerPhysicalBell()` — dispatches a bell ring with 1-second or multi-pulse pattern (500ms on / 100ms off)
-- `setupI2S()` — initializes the I2S driver with DMA buffers on boot
+## Executive Overview
 
-### SD Card Support for UI Files
-The web UI (`login.html`, `dashboard.html`) is now served from an **SD card** (CS pin GPIO 5) instead of SPIFFS, enabling larger, richer HTML pages. The `streamSDFile()` helper automatically falls back to SPIFFS if the SD card is unavailable.
+The evolution of **capstone_elem_smart-bell** spans two major development phases:
 
-### Completely Redesigned Login Page (`ui/login.html`)
-A polished, professional login interface featuring:
-- **FCU logo** image displayed prominently
-- **Building background** overlay photo
-- **Portal title bar** — "FCU ELEMENTARY SCHOOL BELL SYSTEM" with orange accent
-- **Styled input fields** — larger, cleaner design
-- **reCAPTCHA placeholder** text
-- **SIGN IN button** — dark blue with hover effect
-- **Footer link** — "Don't have an account? Sign Here"
-- **Fetch-based login** — the form now uses JavaScript `fetch()` to POST credentials, then handles 401 (invalid), 423 (locked), and 303 (success) responses client-side — no page reload on error
-- **Modal error popup** — styled error dialog with OK button for invalid credentials
+1. **Phase 1 (v1.7 → v2.0.6):** Complete architectural rewrite. The firmware shifted from a single-threaded, linear Arduino loop to a dual-core, event-driven FreeRTOS task model with integrated WiFi probe sniffing and an upgraded audio framework.
+2. **Phase 2 (v2.0.6 → v2.1.0):** Stabilization, bug fixes, and safety hardening. Resolved core timing and scheduling bugs, thread-safety issues, memory leaks, and missing functionality to deliver a production-ready capstone build.
 
-### Completely Redesigned Dashboard (`ui/dashboard.html`)
-A modern, sidebar-based dashboard with multiple views:
+---
 
-| View | Description |
-|---|---|
-| **Dashboard** | Telemetry cards (Device Time, Next Bell, Network Status, Connected SSID), System Controls (Manual Override, Emergency Detection, Ring Bell 3s), bell schedule table with Edit/Delete |
-| **Schedule** | Read-only bell timetable with Next Bell and Scheduled Events counters |
-| **User Management** | Static staff account table (Name, Role, Status, Last Login, Actions) |
-| **Activity Logs** | Security logs textarea with Refresh and Upload (file picker) buttons |
-| **Network Settings** | WiFi config form (AP SSID, Station SSID/Password) with Save & Sync Time button |
-| **Manual** | Quick-start guide, FAQ cards, API reference list |
+## Phase 1: Architectural Rewrite (v1.7 → v2.0.6)
 
-### Schedule Modal with Time-Dial Spinners
-Added an interactive **time-picker modal** for schedule CRUD operations:
-- **Hour spinner** (1–12) with smooth scrolling
-- **Minute spinner** (00–59) with smooth scrolling
-- **AM/PM toggle buttons** with active state highlighting
-- Live preview of the selected 24-hour time
-- Works for both Add and Edit operations
+### 1. FreeRTOS Dual-Core Task Model
+* **v1.7 Architecture:** Ran as a single-threaded linear Arduino sketch using standard `loop()` delays and direct function calls.
+* **v2.0.6 Architecture:** Fully restructured into four dedicated FreeRTOS tasks distributed across both ESP32 cores:
+  * `vSnifferTask` (**Core 0**, Priority 2): Background WiFi probe request sniffing and attendance logging.
+  * `vWebTask` (**Core 1**, Priority 1): Asynchronous web server handling and captive portal DNS processing.
+  * `vSystemEngineTask` (**Core 1**, Priority 3): Hardware button polling, edge detection, and real-time DS3231 RTC schedule matching.
+  * `vAudioTask` (**Core 1**, Priority 5 - Highest): High-priority I2S audio decoding and playback.
+* **Main Loop Modification:** `loop()` was emptied and replaced with `vTaskDelay(portMAX_DELAY)`, leaving all system execution to FreeRTOS tasks.
 
-### Improved Login Error Handling
-- 401 responses show a **styled modal dialog** on the login page (no more fallback HTML page)
-- 423 (lockout) responses show a "temporarily locked" message
-- Network errors show a user-friendly message
-- The login page stays intact on failure — no page redirect
+### 2. Inter-Task Communication & Thread Synchronization
+* **v1.7 Implementation:** Shared global variables accessed directly without mutexes or thread guards.
+* **v2.0.6 Implementation:** Introduced FreeRTOS concurrency primitives to eliminate race conditions and memory corruption:
+  * **Queues:** `xLogQueue` (event and attendance logging) and `xAudioQueue` (audio dispatch requests) for thread-safe inter-task communication.
+  * **Mutexes:** `xI2CMutex` (RTC access), `xScheduleMutex` (JSON schedule memory access), and `xSdMutex` (SPI SD card access).
 
-### Expanded System Controls
-- **Manual Override button** — triggers a manual override event
-- **Emergency Detection button** — activates emergency alert mode
-- **Ring Bell (3s) button** — triggers a physical bell ring via I2S audio
+### 3. Audio Processing Upgrade
+* **v1.7 Audio Engine:** Used direct hardware I2S calls (`setupI2S()`, `i2sPlayTone()`, `triggerPhysicalBell()`) to synthesize raw square wave/sine wave tones.
+* **v2.0.6 Audio Engine:** Migrated to the `Audio.h` library by schreibfaul1. Streams high-quality digital MP3 audio directly from the SD card through a dedicated audio queue handled by `vAudioTask` on Core 1.
 
-### Other Enhancements
-- **Sidebar navigation** with role display (`SuperAdmin`, `Admin`, `User`)
-- **Sign Out button** in sidebar footer
-- **Logs view** automatically fetches on navigation to Activity Logs
-- **15-second auto-refresh** interval for logs
-- **5-second telemetry polling** for live dashboard updates
-- **Upload log file** functionality with file picker in Activity Logs
-- **README updated** to document all v1.7 features
+### 4. Autonomous Attendance Sniffing Engine
+* **v1.7 Implementation:** Non-existent.
+* **v2.0.6 Implementation:** Added background promiscuous-mode WiFi sniffing (`vSnifferTask`). Captures incoming mobile device Probe Requests, de-duplicates MAC addresses, and writes timestamps directly to CSV storage.
+
+### 5. Captive Portal Network Engine
+* **v1.7 Implementation:** Standard AP / Station network hosting without DNS redirection.
+* **v2.0.6 Implementation:** Integrated `DNSServer` with wildcards to catch and redirect incoming network traffic automatically across iOS, Android, and Windows devices.
+
+### 6. Schedule Data Structure Migration
+* **v1.7 Schedule Storage:** Plain-text line-based configuration (`/data/schedule.txt`) storing flat schedule times.
+* **v2.0.6 Schedule Storage:** Structured JSON format (`/data/schedule.json`) powered by `ArduinoJson 7.x`. Supports bitmask day-of-week selection and per-entry MP3 file paths.
+
+---
+
+## Phase 2: Refinement & Stabilization (v2.0.6 → v2.1.0)
+
+Phase 2 resolved critical behavioral bugs, hardware race conditions, and stability bottlenecks identified in v2.0.6.
+
+### Detailed Fix Analysis
+
+#### 1. Day-of-Week Index Mapping Correction
+* **Problem:** Schedules fired on incorrect days of the week.
+* **Cause:** Redundant custom conversion function `dowToIndex()` corrupted the day calculation. The hardware RTC library `RTClib` natively returns `0 = Sunday` through `6 = Saturday`.
+* **Fix:** Removed `dowToIndex()`, aligning day-of-week bitmask evaluation directly with `rtc.now().dayOfTheWeek()`.
+
+#### 2. Exactly-Once-Per-Day Chime Guard
+* **Problem:** Scheduled chimes fired multiple times per minute.
+* **Cause:** The 1-second system engine evaluation tick repeatedly matched schedule entry conditions within a multi-second evaluation window.
+* **Fix:** Added per-entry tracking arrays (`lastFiredStart[]` and `lastFiredEnd[]`). Stores the epoch timestamp of the trigger event and locks duplicate firings until the day rolls over or the schedule reloads.
+
+#### 3. Schedule Mutex Deadlock / Stall Fix
+* **Problem:** System froze for 100 ms during schedule reloads.
+* **Cause:** A non-recursive mutex `xScheduleMutex` was requested twice sequentially before releasing the initial lock.
+* **Fix:** Re-ordered memory unlock routines so schedule reloads execute outside the write-lock boundary.
+
+#### 4. Real-Time Attendance CSV Timestamps
+* **Problem:** Captured attendance entries recorded fake placeholder timestamps (`2026-01-01 00:00:00`).
+* **Cause:** `vSnifferTask` attempted to perform I2C RTC reads directly inside interrupt context or without reading valid clock registers.
+* **Fix:** Moved RTC reads into `vSnifferTask`'s normal execution loop, querying real-time clock data under `xI2CMutex` locks.
+
+#### 5. Hardware Button Debouncing & Edge Detection
+* **Problem:** Holding the physical emergency button triggered continuous alert fires every second.
+* **Cause:** Level-triggered GPIO state checking without state memory.
+* **Fix:** Implemented rising/falling edge detection with state memory. Alerts fire exactly once per press and re-arm only upon full release.
+
+#### 6. SD Card Thread Serialization (`xSdMutex`)
+* **Problem:** Intermittent file system corruption and SPI crashes.
+* **Cause:** `vAudioTask`, `vSnifferTask`, and `vWebTask` accessed the shared SPI SD card simultaneously without synchronization.
+* **Fix:** Wrapped all file system calls in safe helper routines (`sdExists()`, `sdReadFile()`, `appendCSVLine()`) guarded strictly by `xSdMutex`.
+
+#### 7. Access Point WPA2 Security Layer
+* **Problem:** Wi-Fi Access Point remained unencrypted despite using the `FCU_Secure_Bell` name.
+* **Fix:** Added `AP_PASSWORD` configuration checks to enforce WPA2 PSK encryption across all wireless client connections.
+
+#### 8. Chunk-Safe HTTP POST Parsing (`/api/schedule`)
+* **Problem:** Large schedule upload requests failed or crashed the web server.
+* **Cause:** `ESPAsyncWebServer` delivered large JSON bodies in multi-part buffer chunks, which were truncated during parsing.
+* **Fix:** Replaced single-buffer reads with a multi-chunk aggregator. Accumulates body chunks up to 4 KB, validates completeness, and returns HTTP 413 or 400 upon buffer overflow or malformed payloads.
+
+#### 9. Optimized RTC Hardware Initialization
+* **Problem:** I2C bus congestion and high latency during web request processing.
+* **Cause:** `rtc.begin()` ran bus scans continuously inside secondary polling loops.
+* **Fix:** Restricted `rtc.begin()` to a single initialization pass during `setup()`, tracking operational state with a global `rtcOK` boolean flag.
+
+#### 10. Non-Blocking Flag-Driven Schedule Persistence
+* **Problem:** Web server dropped incoming TCP packets when saving schedule modifications.
+* **Cause:** File system writes executed directly inside asynchronous web handler callback threads.
+* **Fix:** Handlers update memory structures and set a `schedulePendingSave` flag. `vSystemEngineTask` processes disk persistence in the background.
+
+#### 11. Autonomous Sniffer Auto-Toggling
+* **Problem:** Attendance sniffer remained inactive (`snifferActive = false`).
+* **Fix:** Connected `vSnifferTask` execution to class time schedules. Promiscuous mode automatically turns **ON** during configured attendance windows and **OFF** during regular hours to preserve access point bandwidth.
+
+---
+
+# capstone_elem_smart-bell — v2.1.0
+
+The **FreeRTOS & Autonomous Attendance Edition** of the FCU Elementary Smart Bell system.
+
+## What's New in v2.1.0
+
+### FreeRTOS Dual-Core Architecture
+Migrated the entire core system from a single-threaded blocking loop to an event-driven, multi-tasking **FreeRTOS dual-core task architecture**. Workloads are distributed across both cores to guarantee zero audio stutter and real-time network responsiveness:
+- **Core 0 (Protocol Core)**: Runs `vSnifferTask` (Priority 2) for promiscuous mode packet capture and passive attendance logging.
+- **Core 1 (Application Core)**: Runs web, audio, and system automation tasks:
+  - `vWebTask` (Priority 1) — Manages `DNSServer` captive portal processing and async HTTP endpoints.
+  - `vSystemEngineTask` (Priority 3) — Real-time DS3231 RTC evaluation, edge-detected button inputs, and sniffer window toggling.
+  - `vAudioTask` (Priority 5 - Highest) — High-priority I2S MP3 streaming directly from the SD card using `Audio.h`.
+- **Thread Safety & Inter-Task Communication**:
+  - **Queues (`xLogQueue`, `xAudioQueue`)** — Thread-safe and ISR-safe messaging between protocol tasks and hardware output drivers.
+  - **Mutexes (`xSdMutex`, `xI2CMutex`, `xScheduleMutex`)** — Serializes access to shared hardware resources (SD card, RTC, and JSON schedule structures) across threads.
+
+### Autonomous Attendance Logging (WiFi Probe Sniffing)
+Integrated background attendance tracking into `vSnifferTask`:
+- **Passive Sniffing** — Captures WiFi Probe Requests to register student/staff devices without requiring them to connect to the network.
+- **Smart Windowing** — Promiscuous mode auto-toggles around scheduled attendance windows so the Access Point stays fully functional outside class times.
+- **Deduplication & Storage** — De-duplicates MAC addresses and logs attendance directly to `/data/logs.csv` with real RTC timestamps.
+
+### Upgraded I2S MP3 Audio Engine (`Audio.h`)
+Replaced basic tone synthesis (`i2sPlayTone()`) with full MP3 stream decoding:
+- Streams high-quality audio files from SD storage directly to the **MAX98357A Class D amplifier**.
+- **Queue-Driven Audio Pipeline** — `vAudioTask` listens on `xAudioQueue` for dispatch requests:
+  - Scheduled class chimes (`/audio/chime.mp3`)
+  - Emergency alert broadcasts (`/audio/alert.mp3`)
+  - Per-entry start/end chime paths
+
+### Captive Portal & Network Upgrades
+- **WPA2-Secured Access Point** — Broadcasts `FCU_Secure_Bell` under WPA2 encryption (`AP_PASSWORD`).
+- **Captive Portal Engine** — Uses `DNSServer` to catch and redirect DNS requests from iOS, Android, and Windows devices directly to the system login interface.
+- **Chunk-Safe JSON API** — Upgraded POST handlers for `/api/schedule` to support chunked transfer encoding up to 4 KB, preventing memory overflows during schedule uploads.
+
+### Scheduling & Hardware Engine Enhancements
+- **Day-of-Week Bitmask Matching** — Schedules support day-of-week bitmasks (Sunday–Saturday) across up to 20 schedule entries in `/data/schedule.json`.
+- **Exactly-Once Firing Guard** — Implements per-entry state tracking (`lastFiredStart[]`, `lastFiredEnd[]`) to ensure scheduled bells fire exactly once per configured minute window.
+- **Hardware Edge Detection** — Physical buttons use edge detection to prevent continuous alert re-triggering while held down.
 
 ## Event Logging Coverage
 
-`logSecurityEvent()` logs ALL system events:
+All system events, attendance entries, and security logs pass through `xLogQueue` to `vSnifferTask` or designated file-writing helper functions:
 
-| Event | Description |
-|---|---|
-| `SYSTEM_BOOT` | System startup |
-| `WIFI_CONNECTION_STARTED_SSID_xxx` | WiFi connection initiated |
-| `WIFI_CONNECTED_SSID_xxx` | WiFi connection successful |
-| `WIFI_CONNECTION_TIMEOUT_SSID_xxx` | WiFi connection timed out |
-| `NTP_SYNC_SUCCESS_SSID_xxx` | NTP time sync succeeded |
-| `NTP_SYNC_TIMEOUT_SSID_xxx` | NTP time sync failed |
-| `FAILED_LOGIN: USERNAME_xxx` | Failed login attempt |
-| `BRUTE_FORCE_LOCKOUT_TRIGGERED` | Lockout activated after max attempts |
-| `LOCKOUT_ACTIVE_REJECTED_LOGIN_ATTEMPT` | Rejected attempt during lockout |
-| `SESSION_TIMED_OUT` | User session expired |
-| `USER_LOGOUT` | User logged out |
-| `SUCCESSFUL_LOGIN` | Successful authentication |
-| `ADDED_SCHEDULE_xx:xx` | Bell schedule added |
-| `REMOVED_SCHEDULE_xx:xx` | Bell schedule deleted |
-| `EDITED_SCHEDULE_FROM_x_TO_y` | Bell schedule edited |
-| `UPDATED_NETWORK_CONFIG` | Network settings saved |
-| `TRIGGERED_MANUAL_BELL` | Manual bell triggered |
-| `SCHEDULE_TRIGGERED_AT_xx:xx` | Automated schedule bell fired |
+| Log Type | Format / Event Tag | Description |
+|---|---|---|
+| **Attendance** | `MAC, RSSI, Timestamp, Status` | WiFi probe capture written to `/data/logs.csv` |
+| **Authentication** | `FAILED_LOGIN`, `LOCKOUT_ACTIVE` | Failed logins and brute-force lockouts |
+| **System** | `SYSTEM_BOOT`, `SNIFFER_STATE_CHANGE` | Boot state and promiscuous mode toggles |
+| **Schedule** | `SCHEDULE_TRIGGERED_AT_xx:xx` | Automated audio dispatch events |
+| **Audio** | `AUDIO_QUEUE_DISPATCH: filename` | File playback requests handled by `vAudioTask` |
 
 ## Hardware Pin Configuration
 
@@ -99,222 +170,164 @@ Added an interactive **time-picker modal** for schedule CRUD operations:
 | MAX98357A DIN | GPIO 25 | Audio data output |
 | MAX98357A BCLK | GPIO 26 | Bit clock |
 | MAX98357A LRC | GPIO 27 | Left/Right clock (Word select) |
-| SD Card CS | GPIO 5 | Chip select for SD card |
-| RTC DS3231 | I2C (SDA/SCL) | Real-time clock |
+| SD Card CS | GPIO 5 | SPI Chip Select for SD storage |
+| RTC DS3231 | I2C (SDA / SCL) | Real-time clock (guarded by `xI2CMutex`) |
 
 ## Prerequisites
 
-Ensure the following directories and files are available:
+Verify the SD card contains the following structure before booting:
 
-- `/ui/dashboard.html` (SD card or SPIFFS)
-- `/ui/login.html` (SD card or SPIFFS)
-- `/data/config.txt`
-- `/data/schedule.txt`
+```text
+/
+├── audio/
+│   ├── chime.mp3
+│   └── alert.mp3
+├── data/
+│   ├── schedule.json
+│   └── logs.csv
+└── ui/
+    ├── login.html
+    └── dashboard.html
 
-If `/data/` is missing, the ESP32 will auto-generate it in SPIFFS `/root` directory.
+```
 
 ## Frontend to Backend Integration
 
-The frontend (HTML/JS files on the SD card) communicates with the backend (ESP32 firmware) entirely over HTTP.
+The frontend communicates asynchronously with the backend over HTTP via `ESPAsyncWebServer` running within a dual-core FreeRTOS context.
 
-### 1. Serving the Pages
+### 1. Dual-Core Request & Audio Flow
 
-When you connect to the ESP32 (either via its AP `FCU_Secure_Bell` or its station IP), the firmware's `WebServer` handles requests:
+When a user connects or an event is triggered, tasks across both cores coordinate execution:
 
 ```cpp
-server.on("/", []() {
-  String userRole = checkSessionRole();
-  if (userRole == "Guest") {
-    // Serve login page from SD card
-    if (!streamSDFile("/ui/login.html", "text/html"))
-      server.send(200, "text/html", fallbackLoginPage());
-  } else {
-    // Serve dashboard from SD card
-    if (!streamSDFile("/ui/dashboard.html", "text/html"))
-      server.send(404, "text/plain", "Error: /ui/dashboard.html missing from SD Card.");
-  }
-});
+// Audio dispatch posted to FreeRTOS queue from web or system tasks
+AudioRequest req;
+strncpy(req.filename, "/audio/chime.mp3", sizeof(req.filename));
+xQueueSend(xAudioQueue, &req, portMAX_DELAY);
+
 ```
 
-**Flow:** Browser → HTTP GET `/` → ESP32 reads `login.html` or `dashboard.html` from SD card → sends HTML back to browser.
+**Flow:** Browser / Event Trigger → `vWebTask` / `vSystemEngineTask` (Core 1) → Pushes request to `xAudioQueue` → `vAudioTask` (Core 1, Priority 5) unblocks and streams MP3 from SD card to MAX98357A I2S amplifier via `Audio.h`.
 
-### 2. Session Authentication (Cookie-based)
+### 2. Autonomous Attendance Pipeline
 
-The backend tracks logged-in users with **HTTP-only cookies**:
+```cpp
+// Core 0 WiFi promiscuous mode callback pushes captured MACs to logging queue
+void IRAM_ATTR promiscuous_cb(void* buf, wifi_promiscuous_pkt_type_t type) {
+    // Extract MAC, RSSI, and dispatch to xLogQueue safely
+}
 
-| Step | What Happens |
-|---|---|
-| **Login** | Browser POSTs username+password to `/handleLogin` → ESP validates via MD5 hash → creates a server-side session → sets `Set-Cookie: ESPSESSIONID=<random_token>; Path=/; HttpOnly` response header |
-| **Fetch-based login (v1.7)** | The login page intercepts form submit with `fetch()`, handles 401/423/303 responses client-side, shows modal on error, redirects on success |
-| **Subsequent requests** | Browser automatically sends `Cookie: ESPSESSIONID=<token>` with every request → `checkSessionRole()` reads the cookie, looks up the session, returns the role (`SuperAdmin`, `Admin`, `User`, or `Guest`) |
-| **Logout** | `/logout` clears the cookie and invalidates the session |
-| **Timeout** | Sessions expire after 10 minutes (`SESSION_TIMEOUT = 600000ms`) of inactivity |
+```
 
-### 3. API Calls from Dashboard JavaScript
+**Flow:** Core 0 (`vSnifferTask`) captures WiFi Probe Requests → de-duplicates MAC addresses → pushes log structure to `xLogQueue` → serialized write to `/data/logs.csv` using `xSdMutex`.
 
-The dashboard (`ui/dashboard.html`) uses `fetch()` to call backend API endpoints.
+### 3. API Call Summary from Dashboard JavaScript
 
-#### `loadTelemetry()` — Polling device status
+The dashboard (`ui/dashboard.html`) communicates with the ESP32 backend using non-blocking `fetch()` calls:
+
+#### `loadTelemetry()` — Device Status & Sniffer State
+
 ```javascript
-// Called on page load, then every 5 seconds via setInterval()
 async function loadTelemetry() {
   const res = await fetch('/api/telemetry', { cache: 'no-store' });
   if (!res.ok) { window.location.href = '/'; return; }
   const data = await res.json();
-  // Update UI: time, status, SSID, role pill
+  // Update UI: time, connection status, sniffer state, active window
 }
+
 ```
 
-#### `loadConfig()` — Pre-populate network fields
+#### `fetchSchedule()` — Load JSON Bell Schedule
+
 ```javascript
-async function loadConfig() {
-  const res = await fetch('/api/config', { cache: 'no-store' });
+async function fetchSchedule() {
+  const res = await fetch('/api/schedule', { cache: 'no-store' });
   const data = await res.json();
-  document.getElementById('ap_name').value = data.ap_ssid || '';
-  document.getElementById('station_ssid').value = data.sta_ssid || '';
-  document.getElementById('station_pass').value = data.sta_pass || '';
+  // Render schedule table rows with time, days bitmask, and chime paths
 }
+
 ```
 
-#### `saveNetwork()` — Save WiFi settings
+#### `saveSchedule()` — Chunk-Safe Schedule POST
+
 ```javascript
-async function saveNetwork() {
-  const res = await fetch('/saveNetwork', {
+async function saveSchedule(scheduleJson) {
+  const res = await fetch('/api/schedule', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'ap_name=...&station_ssid=...&station_pass=...'
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(scheduleJson)
   });
-  const data = await res.json();
-  msg.textContent = data.message; // "Network config saved. Attempting connection..."
+  if (res.ok) alert('Schedule updated successfully!');
 }
+
 ```
 
-#### `refreshSchedules()` — Load bell schedule
+#### `fetchAttendance()` — Retrieve Attendance Records
+
 ```javascript
-async function refreshSchedules() {
-  const res = await fetch('/api/schedules', { cache: 'no-store' });
-  const list = await res.json();
-  // Render table rows with Edit/Delete buttons
+async function fetchAttendance() {
+  const res = await fetch('/api/attendance', { cache: 'no-store' });
+  const csvText = await res.text();
+  // Parse and display MAC attendance logs
 }
+
 ```
 
-#### Schedule CRUD operations
+#### `triggerManualChime()` — Manual Bell Control
+
 ```javascript
-// Add schedule (via modal)
-await fetch('/addSchedule', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  body: 'sched_time=' + encodeURIComponent('08:00')
-});
-
-// Edit schedule (via modal)
-await fetch('/editSchedule', {
-  method: 'POST',
-  body: 'index=0&sched_time=' + encodeURIComponent('09:00')
-});
-
-// Delete schedule
-await fetch('/deleteSchedule', {
-  method: 'POST',
-  body: 'index=' + encodeURIComponent(index)
-});
-```
-
-#### `ringBell()` — Trigger manual bell via I2S audio
-```javascript
-async function ringBell() {
+async function triggerManualChime() {
   const res = await fetch('/ring', { method: 'GET' });
-  if (!res.ok) { msg.textContent = 'Failed (not authorized?)'; return; }
-  msg.textContent = 'Bell Dispatched.';
+  if (res.ok) console.log('Chime dispatch queued.');
 }
+
 ```
-
-#### `refreshLogs()` — Fetch security logs
-```javascript
-async function refreshLogs() {
-  const res = await fetch('/backend/logs', { cache: 'no-store' });
-  const text = await res.text();
-  document.getElementById('logs').value = text || '';
-}
-```
-
-### 4. Login Form Submission (v1.7 Fetch-based)
-
-The login page (`ui/login.html`) now uses JavaScript `fetch()` instead of HTML form POST:
-
-```javascript
-document.getElementById('login-form').addEventListener('submit', async function(e) {
-  e.preventDefault();
-  const res = await fetch('/handleLogin', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password)
-  });
-  // 401 → showModal('Invalid username or password')
-  // 423 → showModal('Account temporarily locked...')
-  // 303 → window.location.href = location header
-});
-```
-
-### 5. Error Handling & Redirects
-
-| Status Code | Meaning | Frontend Reaction |
-|---|---|---|
-| **403** | `Guest` (not logged in) trying to access a protected endpoint | Dashboard redirects to `/` (login) |
-| **423** | Account is locked out due to brute-force protection | ESP returns lockout page |
-| **303** | Successful login/logout | Browser follows redirect to `/` |
-| **401** | Login failed | ESP returns 401, login page shows fetch()-handled error modal (no page reload) |
-
-### 6. The Data Files
-
-| File | Read by | Written by | Purpose |
-|---|---|---|---|
-| `data/config.txt` | `loadConfiguration()` on boot | `/saveNetwork` endpoint | Persists AP SSID, station SSID, station password |
-| `data/schedule.txt` | `loadSchedules()` on boot | `/addSchedule`, `/editSchedule`, `/deleteSchedule` endpoints | Persists bell schedule times |
-| `data/security_log.txt` | `/backend/logs` endpoint | `logSecurityEvent()` | Persists all security/system events |
 
 ### Summary Diagram
 
-```
-┌──────────────────────┐         HTTP          ┌───────────────────────────┐
-│   Browser (Client)   │ ◄──────────────────►   │    ESP32 (Server/Self)    │
-│                      │                        │                           │
-│  ui/login.html       │   GET /                │  WebServer (port 80)      │
-│  ui/dashboard.html   │   POST /handleLogin    │  SD Card + SPIFFS         │
-│                      │   GET /api/telemetry   │  - reads HTML files       │
-│  JavaScript (fetch)  │   GET /api/config      │  - reads/writes data/     │
-│  - loadTelemetry()   │   POST /saveNetwork    │  - reads/writes logs      │
-│  - loadConfig()      │   GET /api/schedules   │                           │
-│  - saveNetwork()     │   POST /addSchedule    │  I2S Audio (MAX98357A)    │
-│  - refreshSchedules()│   POST /editSchedule   │  - triggerPhysicalBell()  │
-│  - ringBell()        │   POST /deleteSchedule │  - i2sPlayTone()          │
-│  - refreshLogs()     │   GET /ring            │                           │
-│                      │   GET /backend/logs    │  Session Manager          │
-│  Cookie:             │   GET /backend/logs/   │  - in-memory sessions[]   │
-│  ESPSESSIONID=xxx    │        upload          │  - ESPSESSIONID cookie    │
-│                      │   GET /logout          │  - 10-minute timeout      │
-│                      │                        │                           │
-│  fetch()-based       │                        │  RTC + NTP                │
-│  login (no reload)   │                        │  - time tracking          │
-│                      │                        │                           │
-└──────────────────────┘                        └───────────────────────────┘
+```text
+┌──────────────────────┐         HTTP (Async)         ┌─────────────────────────────────────────┐
+│   Browser / Client   │ ◄──────────────────────────► │           ESP32 (Core 0 & Core 1)       │
+│                      │                              │                                         │
+│ - Captive Portal UI  │   GET /                      │  Core 1: vWebTask (Priority 1)          │
+│ - JS fetch() polling │   GET /api/telemetry         │  - DNSServer Captive Portal             │
+│ - Schedule Editor    │   POST /api/schedule         │  - ESPAsyncWebServer                    │
+│                      │   GET /api/attendance        │  - Cookie Session Auth                  │
+└──────────────────────┘                              └───────────────────┬─────────────────────┘
+                                                                          │
+                                                                   xAudioQueue / xLogQueue
+                                                                          │
+                                                      ┌───────────────────▼─────────────────────┐
+                                                      │           FreeRTOS Hardware Tasks       │
+                                                      │                                         │
+                                                      │  Core 1: vAudioTask (Priority 5)        │
+                                                      │  - Reads MP3s from SD via xSdMutex     │
+                                                      │  - Drives MAX98357A via Audio.h         │
+                                                      │                                         │
+                                                      │  Core 1: vSystemEngineTask (Priority 3) │
+                                                      │  - RTC schedule evaluation              │
+                                                      │                                         │
+                                                      │  Core 0: vSnifferTask (Priority 2)      │
+                                                      │  - WiFi Probe Request capture           │
+                                                      │  - Writes /data/logs.csv via xSdMutex   │
+                                                      └─────────────────────────────────────────┘
+
 ```
 
 ## API Endpoints
 
 | Endpoint | Method | Auth Required | Description |
-|---|---|---|---|
-| `/` | GET | Cookie (session) | Serves login or dashboard |
-| `/api/telemetry` | GET | Cookie (session) | Device time, status, SSID, AP SSID, role |
-| `/api/config` | GET | Cookie (session) | Network configuration |
-| `/api/schedules` | GET | Cookie (session) | Bell schedule list |
-| `/handleLogin` | POST | None | Username/password authentication |
-| `/saveNetwork` | POST | Cookie (session) | Save WiFi config and connect |
-| `/addSchedule` | POST | Cookie (session) | Add a bell schedule time |
-| `/editSchedule` | POST | Cookie (session) | Edit an existing schedule |
-| `/deleteSchedule` | POST | Cookie (session) | Delete a schedule |
-| `/ring` | GET | Cookie (session) | Trigger manual bell (3s) via I2S audio |
-| `/backend/logs` | GET | SuperAdmin | View security logs |
-| `/backend/logs/upload` | POST | SuperAdmin | Upload/replace security logs |
-| `/logout` | GET | Cookie (session) | End session |
+| --- | --- | --- | --- |
+| `/` | GET | Cookie (Session) | Serves captive portal `login.html` or `dashboard.html` |
+| `/api/telemetry` | GET | Cookie (Session) | Device time, WiFi mode, sniffer status, and connection state |
+| `/api/schedule` | GET / POST | Cookie (Session) | Fetches or updates JSON schedule configuration (chunk-safe) |
+| `/api/attendance` | GET | Cookie (Session) | Downloads parsed attendance logs from `/data/logs.csv` |
+| `/api/attendance/status` | GET | Cookie (Session) | Returns current promiscuous mode / sniffer window state |
+| `/api/config` | GET / POST | Cookie (Session) | Manages WiFi AP/Station credentials |
+| `/handleLogin` | POST | None | Authenticates session credentials via client `fetch()` |
+| `/ring` | GET | Cookie (Session) | Pushes manual chime request to `xAudioQueue` |
+| `/logout` | GET | Cookie (Session) | Clears session cookie and invalidates session token |
 
+```
+
+```
