@@ -1,0 +1,1 @@
+{"schedules":[{"chimeEnd":"/audio/chime.mp3","chimeStart":"/audio/chime.mp3","days":["Mon","Tue","Wed","Thu","Fri"],"endTime":"08:05","id":1,"startTime":"08:00","subject":"Morning Bell"},{"chimeEnd":"/audio/chime.mp3","chimeStart":"/audio/chime.mp3","days":["Mon","Tue","Wed","Thu","Fri"],"endTime":"17:00","id":2,"startTime":"08:00","subject":"Dismissal"}]}

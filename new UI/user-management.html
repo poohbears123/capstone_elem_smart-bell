@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>User Management | FCU Bell System</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <section class="dashboard-page" style="display:flex;">
+    <aside class="sidebar">
+      <div>
+        <div class="profile-section">
+          <img src="pfp.jpg" alt="Profile" />
+          <h2>ADMIN</h2>
+        </div>
+
+        <nav class="menu">
+          <a href="index.html">
+            <i class="fa-solid fa-gauge"></i>
+            Dashboard
+          </a>
+          <a href="schedule.html">
+            <i class="fa-solid fa-calendar-days"></i>
+            Schedule
+          </a>
+          <a href="user-management.html" class="active">
+            <i class="fa-solid fa-person"></i>
+            User Management
+          </a>
+          <a href="activity-logs.html">
+            <i class="fa-solid fa-clock"></i>
+            Activity Logs
+          </a>
+          <a href="manual.html">
+            <i class="fa-solid fa-hand"></i>
+            Manual
+          </a>
+        </nav>
+      </div>
+
+      <div class="logout">
+        <a href="index.html">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          Sign Out
+        </a>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <section class="page-title">
+        <h2>User Management</h2>
+        <p>Manage staff accounts and access permissions</p>
+      </section>
+
+      <section class="cards">
+        <div class="card">
+          <i class="fa-solid fa-users"></i>
+          <h3>Total Users</h3>
+          <p>12</p>
+        </div>
+        <div class="card">
+          <i class="fa-solid fa-user-shield"></i>
+          <h3>Admin Accounts</h3>
+          <p>3</p>
+        </div>
+        <div class="card">
+          <i class="fa-solid fa-circle-check"></i>
+          <h3>Active Users</h3>
+          <p>10</p>
+        </div>
+      </section>
+
+      <section class="table-section">
+        <h2>Account Overview</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Last Login</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Maria Santos</td>
+              <td>Administrator</td>
+              <td><span class="status-badge active">Active</span></td>
+              <td>Today, 07:20 AM</td>
+              <td><button type="button" class="user-action">Edit</button></td>
+            </tr>
+            <tr>
+              <td>John Cruz</td>
+              <td>Staff</td>
+              <td><span class="status-badge active">Active</span></td>
+              <td>Yesterday, 04:15 PM</td>
+              <td><button type="button" class="user-action">Edit</button></td>
+            </tr>
+            <tr>
+              <td>Rosa Dela Vega</td>
+              <td>Viewer</td>
+              <td><span class="status-badge pending">Pending</span></td>
+              <td>Never</td>
+              <td><button type="button" class="user-action" data-action="approve">Approve</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </section>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Activity Logs | FCU Bell System</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <section class="dashboard-page" style="display:flex;">
+    <aside class="sidebar">
+      <div>
+        <div class="profile-section">
+          <img src="pfp.jpg" alt="Profile" />
+          <h2>ADMIN</h2>
+        </div>
+
+        <nav class="menu">
+          <a href="index.html">
+            <i class="fa-solid fa-gauge"></i>
+            Dashboard
+          </a>
+          <a href="schedule.html">
+            <i class="fa-solid fa-calendar-days"></i>
+            Schedule
+          </a>
+          <a href="user-management.html">
+            <i class="fa-solid fa-person"></i>
+            User Management
+          </a>
+          <a href="activity-logs.html" class="active">
+            <i class="fa-solid fa-clock"></i>
+            Activity Logs
+          </a>
+          <a href="manual.html">
+            <i class="fa-solid fa-hand"></i>
+            Manual
+          </a>
+        </nav>
+      </div>
+
+      <div class="logout">
+        <a href="index.html">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          Sign Out
+        </a>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <section class="page-title">
+        <h2>Activity Logs</h2>
+        <p>Monitor recent system events and admin actions</p>
+      </section>
+
+      <section class="cards">
+        <div class="card">
+          <i class="fa-solid fa-list-check"></i>
+          <h3>Today&apos;s Actions</h3>
+          <p>18</p>
+        </div>
+        <div class="card">
+          <i class="fa-solid fa-triangle-exclamation"></i>
+          <h3>Alerts</h3>
+          <p>2</p>
+        </div>
+        <div class="card">
+          <i class="fa-solid fa-rotate-right"></i>
+          <h3>Last Sync</h3>
+          <p>08:15 AM</p>
+        </div>
+      </section>
+
+      <section class="table-section">
+        <h2>Recent Activity</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Activity</th>
+              <th>Performed By</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>07:20 AM</td>
+              <td>Updated morning bell schedule</td>
+              <td>Maria Santos</td>
+              <td><span class="status-badge active">Success</span></td>
+            </tr>
+            <tr>
+              <td>06:45 AM</td>
+              <td>Manual bell test executed</td>
+              <td>John Cruz</td>
+              <td><span class="status-badge active">Success</span></td>
+            </tr>
+            <tr>
+              <td>06:10 AM</td>
+              <td>Low battery warning acknowledged</td>
+              <td>System</td>
+              <td><span class="status-badge pending">Needs Attention</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+  </section>
+</body>
+</html>

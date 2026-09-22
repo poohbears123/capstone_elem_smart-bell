@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Schedule | FCU Bell System</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <section class="dashboard-page" style="display:flex;">
+    <aside class="sidebar">
+      <div>
+        <div class="profile-section">
+          <img src="pfp.jpg" alt="Profile" />
+          <h2>ADMIN</h2>
+        </div>
+
+        <nav class="menu">
+          <a href="index.html">
+            <i class="fa-solid fa-gauge"></i>
+            Dashboard
+          </a>
+          <a href="schedule.html" class="active">
+            <i class="fa-solid fa-calendar-days"></i>
+            Schedule
+          </a>
+          <a href="user-management.html">
+            <i class="fa-solid fa-person"></i>
+            User Management
+          </a>
+          <a href="activity-logs.html">
+            <i class="fa-solid fa-clock"></i>
+            Activity Logs
+          </a>
+          <a href="manual.html">
+            <i class="fa-solid fa-hand"></i>
+            Manual
+          </a>
+        </nav>
+      </div>
+
+      <div class="logout">
+        <a href="index.html">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          Sign Out
+        </a>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <section class="page-title">
+        <h2>Bell Schedule</h2>
+        <p>View and manage class transition times</p>
+      </section>
+
+      <section class="cards">
+        <div class="card">
+          <i class="fa-regular fa-clock"></i>
+          <h3>Next Bell</h3>
+            <p id="next-bell">--</p>
+        </div>
+        <div class="card">
+          <i class="fa-solid fa-bell"></i>
+          <h3>Audio Mode</h3>
+          <p>Auto</p>
+        </div>
+        <div class="card">
+          <i class="fa-solid fa-list-ol"></i>
+          <h3>Scheduled Events</h3>
+            <p id="schedule-count">0</p>
+        </div>
+      </section>
+
+      <section class="table-section">
+        <div class="section-heading">
+          <h2>Daily Bell Timetable</h2>
+          <button type="button" id="add-schedule">Add Schedule</button>
+        </div>
+        <form id="standalone-schedule-form" class="schedule-form">
+          <div class="form-row">
+            <input type="text" id="standalone-time" placeholder="Time" required />
+            <input type="text" id="standalone-description" placeholder="Event" required />
+            <input type="text" id="standalone-audio" placeholder="Audio filename (optional)" />
+            <input type="file" id="standalone-audio-file" accept="audio/*" />
+          </div>
+          <div class="form-actions">
+            <button type="submit">Save Schedule</button>
+            <button type="button" id="cancel-schedule" class="secondary-btn">Cancel</button>
+          </div>
+        </form>
+        <table>
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Event</th>
+              <th>Audio</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="standalone-schedule-body"></tbody>
+        </table>
+      </section>
+    </main>
+  </section>
+  <script src="app.js"></script>
+</body>
+</html>

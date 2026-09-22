@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FCU Bell System</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- ================= LOGIN (POST /handleLogin -> FCU_SESS cookie, firmware v2.2.0) ================= -->
+  <section class="login-page" id="login-page">
+    <div class="background"></div>
+    <div class="login-container">
+      <div class="logo-section"><img src="FCU.jpg" alt="Logo" /></div>
+      <div class="portal-title">FCU ELEMENTARY<center>SCHOOL BELL SYSTEM</center></div>
+      <form id="login-form" autocomplete="off">
+        <div class="input-group"><input type="text" id="login-username" placeholder="Username" required /></div>
+        <div class="input-group"><input type="password" id="login-password" placeholder="Password" required /></div>
+        <p id="login-message" class="login-error"></p>
+        <div class="captcha-text">Protected by reCAPTCHA v3</div>
+        <button type="submit" class="login-btn">SIGN IN</button>
+      </form>
+      <div class="footer-text">Don't have an account? <span>Sign Here</span></div>
+      <p class="login-note">Signs in via <code class="mono">POST /handleLogin</code> (session cookie <code class="mono">FCU_SESS</code>). Default: <code class="mono">admin / admin123</code> — change <code class="mono">ADMIN_USER/PASS</code> in firmware before deploying.</p>
+    </div>
+  </section>
+
+  <!-- ================= DASHBOARD ================= -->
+  <section class="dashboard-page" id="dashboard-page">
+    <aside class="sidebar">
+      <div>
+        <div class="profile-section">
+          <img id="profile-avatar" src="pfp.jpg" alt="Profile" />
+          <h2 id="profile-name">ADMIN</h2>
+          <a href="#" class="profile-settings-link" data-view="settings-view"><i class="fa-solid fa-gear"></i> Settings</a>
+        </div>
+        <nav class="menu">
+          <a href="#" class="active" data-view="dashboard-view"><i class="fa-solid fa-gauge"></i> Dashboard</a>
+          <a href="#" data-view="schedule-view"><i class="fa-solid fa-calendar-days"></i> Schedule</a>
+          <a href="#" data-view="attendance-view"><i class="fa-solid fa-users"></i> Attendance</a>
+          <a href="#" data-view="network-view"><i class="fa-solid fa-wifi"></i> Network</a>
+          <a href="#" data-view="user-view"><i class="fa-solid fa-person"></i> User Management</a>
+          <a href="#" data-view="activity-view"><i class="fa-solid fa-clock"></i> Activity Logs</a>
+          <a href="#" data-view="manual-view"><i class="fa-solid fa-hand"></i> Manual</a>
+        </nav>
+      </div>
+      <div class="logout"><a href="#" id="logout-link"><i class="fa-solid fa-right-from-bracket"></i> Sign Out</a></div>
+    </aside>
+
+    <main class="main-content">
+      <!-- Dashboard -->
+      <section class="view-section active" id="dashboard-view">
+        <section class="page-title">
+          <h2>Smart School Bell Automation System</h2>
+          <p>FCU Elementary Department – Web Dashboard · <code class="mono">GET /api/telemetry · /api/schedule · /api/attendance</code></p>
+        </section>
+        <section class="cards">
+          <div class="card"><i class="fa-regular fa-clock"></i><h3>Device Time (RTC)</h3><p id="current-time">--</p></div>
+          <div class="card"><i class="fa-regular fa-bell"></i><h3>Next Bell</h3><p id="next-bell">--</p></div>
+          <div class="card"><i class="fa-solid fa-gear"></i><h3>System Mode</h3><p id="system-mode">--</p><div class="sub">Network: <span id="network-status">--</span> · SSID: <span id="connected-ssid">--</span> · AP: <span id="ap-ssid">--</span></div></div>
+        </section>
+
+        <section class="action-panel">
+          <h2>System Controls</h2>
+          <div class="action-buttons">
+            <button type="button" id="manual-override-btn">Manual Override</button>
+            <button type="button" id="ring-bell-btn">Ring Bell</button>
+            <button type="button" id="emergency-btn" class="danger-btn">Emergency Detection</button>
+            <button type="button" id="backup-btn" class="secondary-btn">Backup &amp; Restore</button>
+            <button type="button" id="test-btn" class="secondary-btn">Test Connection</button>
+          </div>
+          <p id="action-message" class="message"></p>
+          <div class="upload-row" style="display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap">
+            <input type="file" id="audio-upload-file" accept=".wav,audio/wav" />
+            <button type="button" id="upload-audio-btn" class="secondary-btn">Upload Chime (.wav ≤300KB)</button>
+            <button type="button" id="refresh-audio-btn" class="secondary-btn">Refresh Audio</button>
+          </div>
+          <p id="upload-message" class="message"></p>
+          <ul id="audio-list" class="small"></ul>
+          <p class="small">Ring Bell calls <code class="mono">GET /ring</code> (queues the chime on the device); Emergency calls <code class="mono">GET /ring?file=alert.wav</code>. Scheduled bells still fire from <code class="mono">/api/schedule</code> via the RTC engine. Backup downloads <code class="mono">schedule.json</code>; Test calls <code class="mono">GET /test</code>.</p>
+        </section>
+
+        <section class="table-section">
+          <div class="section-heading"><h2>Bell Schedule &amp; Custom Audio</h2><span class="small">POST JSON → <code class="mono">/api/schedule</code></span></div>
+          <form id="schedule-form" class="schedule-form">
+            <input type="hidden" id="edit-id" />
+            <div class="form-row">
+              <input type="text" id="schedule-time" placeholder="HH:MM" inputmode="numeric" maxlength="5" required />
+              <select id="schedule-period" required><option value="AM">AM</option><option value="NN">NN</option><option value="PM">PM</option></select>
+              <input type="text" id="schedule-description" placeholder="Description (= subject)" required />
+              <input type="file" id="schedule-audio-file" accept="audio/*" />
+            </div>
+            <div class="day-checks">
+              <label><input type="checkbox" name="sched-day" value="Sun" /> Sun</label>
+              <label><input type="checkbox" name="sched-day" value="Mon" checked /> Mon</label>
+              <label><input type="checkbox" name="sched-day" value="Tue" checked /> Tue</label>
+              <label><input type="checkbox" name="sched-day" value="Wed" checked /> Wed</label>
+              <label><input type="checkbox" name="sched-day" value="Thu" checked /> Thu</label>
+              <label><input type="checkbox" name="sched-day" value="Fri" checked /> Fri</label>
+              <label><input type="checkbox" name="sched-day" value="Sat" /> Sat</label>
+            </div>
+            <p class="small" style="margin-top:8px">Days map to firmware <code class="mono">days[]</code> bitmask. Audio file name maps to <code class="mono">chimeStart/chimeEnd = /audio/&lt;name&gt;</code>. Upload 16-bit mono <code class="mono">.wav</code> (≤300KB) via System Controls above — no SD card removal needed.</p>
+            <div class="form-actions">
+              <button type="submit" id="save-schedule-btn">Save Schedule</button>
+              <button type="button" id="cancel-edit-btn" class="secondary-btn">Cancel</button>
+            </div>
+          </form>
+          <p id="schedule-message" class="message"></p>
+          <table>
+            <thead><tr><th>Time</th><th>Description</th><th>Days</th><th>Audio</th><th>Action</th></tr></thead>
+            <tbody id="schedule-body"></tbody>
+          </table>
+        </section>
+      </section>
+
+      <!-- Schedule -->
+      <section class="view-section" id="schedule-view">
+        <section class="page-title"><h2>Bell Schedule</h2><p>Live from <code class="mono">GET /api/schedule</code></p></section>
+        <section class="cards">
+          <div class="card"><i class="fa-regular fa-clock"></i><h3>Next Bell</h3><p id="schedule-next-bell">--</p></div>
+          <div class="card"><i class="fa-solid fa-bell"></i><h3>Audio Mode</h3><p>Auto</p></div>
+          <div class="card"><i class="fa-solid fa-list-ol"></i><h3>Scheduled Events</h3><p id="schedule-count">0</p></div>
+        </section>
+        <section class="table-section">
+          <h2>Daily Bell Timetable</h2>
+          <table><thead><tr><th>Time</th><th>Event</th><th>Audio</th></tr></thead><tbody id="schedule-list-body"></tbody></table>
+        </section>
+      </section>
+
+      <!-- Attendance (real firmware feature) -->
+      <section class="view-section" id="attendance-view">
+        <section class="page-title"><h2>Attendance Monitoring</h2><p>Live from <code class="mono">GET /api/attendance</code> (CSV) + <code class="mono">GET /api/attendance/status</code></p></section>
+        <section class="cards">
+          <div class="card"><i class="fa-solid fa-users"></i><h3>Devices Detected</h3><p id="attendance-count">0</p></div>
+          <div class="card"><i class="fa-solid fa-circle-check"></i><h3>Attendance Status</h3><p><span id="attendance-status" class="status-badge inactive">INACTIVE</span></p></div>
+          <div class="card"><i class="fa-solid fa-signal"></i><h3>Avg Signal</h3><p id="attendance-avg-rssi">-- dBm</p></div>
+        </section>
+        <section class="table-section">
+          <div class="section-heading"><h2>Device Log (Most Recent First)</h2><div class="row"><span class="small" id="attendance-refresh-time"></span><button type="button" id="refresh-attendance-btn" class="secondary-btn">Refresh Data</button></div></div>
+          <table><thead><tr><th>Timestamp</th><th>MAC Address</th><th>RSSI</th><th>Status</th></tr></thead><tbody id="attendance-table-body"><tr><td colspan="4" class="empty-state">No attendance records yet.</td></tr></tbody></table>
+          <p class="small" style="margin-top:8px">CSV columns: <code class="mono">Timestamp,MAC_Address,RSSI,Status</code> from <code class="mono">/data/logs.csv</code> on SD. Attendance activates automatically during class windows; 5-minute dedup applies.</p>
+        </section>
+      </section>
+
+      <!-- Network Settings (GET/POST /api/config) -->
+      <section class="view-section" id="network-view">
+        <section class="page-title"><h2>Network Settings</h2><p>Live from <code class="mono">GET /api/config</code> — saved to SPIFFS and applied immediately</p></section>
+        <section class="table-section">
+          <div class="network-form schedule-form">
+            <div class="form-row">
+              <div><label for="net-ap">AP SSID (device hotspot name)</label><input id="net-ap" type="text" placeholder="e.g., FCU_Secure_Bell" /></div>
+              <div><label for="net-ssid">Station SSID (WiFi to join)</label><input id="net-ssid" type="text" placeholder="e.g., MyWiFi" /></div>
+              <div><label for="net-pass">Station Password</label><input id="net-pass" type="password" placeholder="8–63 chars, or blank" /></div>
+            </div>
+            <div class="form-actions">
+              <button id="save-network-btn" type="button">Save &amp; Apply</button>
+              <span id="netMsg" class="small"></span>
+            </div>
+            <p class="small" style="margin-top:8px">Rules: AP name 1–31 chars; station SSID 0–31; station password blank or 8–63 chars. Changing the AP name disconnects current clients.</p>
+          </div>
+        </section>
+        <section class="table-section">
+          <h2>Device Time (RTC + NTP)</h2>
+          <p class="small">RTC runs the bells offline. When the station WiFi is online, NTP syncs it (Asia/Manila UTC+8, auto every 6h).</p>
+          <div class="form-actions" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button id="sync-time-btn" type="button" class="secondary-btn">Sync Time (NTP)</button>
+            <span id="timeMsg" class="small"></span>
+            <span class="small">Last NTP: <code class="mono" id="last-ntp">--</code></span>
+          </div>
+        </section>
+      </section>
+
+      <!-- User Management (static: no firmware endpoint) -->
+      <section class="view-section" id="user-view">
+        <section class="page-title"><h2>User Management</h2><p>Static demo — firmware v2.2.0 exposes no user API</p></section>
+        <section class="cards">
+          <div class="card"><i class="fa-solid fa-users"></i><h3>Total Users</h3><p>12</p></div>
+          <div class="card"><i class="fa-solid fa-user-shield"></i><h3>Admin Accounts</h3><p>3</p></div>
+          <div class="card"><i class="fa-solid fa-circle-check"></i><h3>Active Users</h3><p>10</p></div>
+        </section>
+        <section class="table-section">
+          <h2>Account Overview</h2>
+          <table><thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Last Login</th><th>Action</th></tr></thead>
+          <tbody>
+            <tr><td>Maria Santos</td><td>Administrator</td><td><span class="status-badge active">Active</span></td><td>Today, 07:20 AM</td><td><button type="button">Edit</button></td></tr>
+            <tr><td>John Cruz</td><td>Staff</td><td><span class="status-badge active">Active</span></td><td>Yesterday, 04:15 PM</td><td><button type="button">Edit</button></td></tr>
+            <tr><td>Rosa Dela Vega</td><td>Viewer</td><td><span class="status-badge pending">Pending</span></td><td>Never</td><td><button type="button">Approve</button></td></tr>
+          </tbody></table>
+        </section>
+      </section>
+
+      <!-- Activity Logs (static: no /backend/logs in firmware) -->
+      <section class="view-section" id="activity-view">
+        <section class="page-title"><h2>Activity Logs</h2><p>Static demo — for live device detections open Attendance (<code class="mono">GET /api/attendance</code>)</p></section>
+        <section class="cards">
+          <div class="card"><i class="fa-solid fa-list-check"></i><h3>Today's Actions</h3><p>18</p></div>
+          <div class="card"><i class="fa-solid fa-triangle-exclamation"></i><h3>Alerts</h3><p>2</p></div>
+          <div class="card"><i class="fa-solid fa-rotate-right"></i><h3>Last Sync</h3><p id="last-sync-card">--</p></div>
+        </section>
+        <section class="table-section">
+          <h2>Recent Activity</h2>
+          <table><thead><tr><th>Time</th><th>Activity</th><th>Performed By</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td>07:20 AM</td><td>Updated morning bell schedule</td><td>Maria Santos</td><td><span class="status-badge active">Success</span></td></tr>
+            <tr><td>06:45 AM</td><td>Manual bell test executed</td><td>John Cruz</td><td><span class="status-badge active">Success</span></td></tr>
+            <tr><td>06:10 AM</td><td>Low battery warning acknowledged</td><td>System</td><td><span class="status-badge pending">Needs Attention</span></td></tr>
+          </tbody></table>
+        </section>
+      </section>
+
+      <!-- Manual -->
+      <section class="view-section" id="manual-view">
+        <section class="page-title"><h2>System Manual</h2><p>Quick guide for daily operation and support</p></section>
+        <section class="table-section">
+          <h2>How to Use the System</h2>
+          <ol class="manual-list">
+            <li>Sign in on the local gate page (no device account check).</li>
+            <li>Dashboard cards show live RTC time, next bell, and mode from <code class="mono">GET /api/telemetry</code>.</li>
+            <li>Edit the bell table — every save does <code class="mono">GET → modify → POST /api/schedule</code> with keys <code class="mono">id, subject, days[], startTime, endTime, chimeStart, chimeEnd</code>.</li>
+            <li>Open Attendance for live probe-request detections (<code class="mono">GET /api/attendance</code>).</li>
+            <li>Use Backup to download <code class="mono">schedule.json</code>.</li>
+          </ol>
+        </section>
+        <section class="table-section">
+          <h2>Firmware API Reference (v2.2.0)</h2>
+          <div class="small">
+            <ul style="margin-left:20px;line-height:1.8;">
+              <li><code class="mono">GET /api/telemetry</code> → <code class="mono">{time,status,ssid,ap_ssid,attendance,sniffer,schedule_count,ntp_ok,last_ntp}</code></li>
+              <li><code class="mono">GET /api/schedule</code> → <code class="mono">{schedules:[{id,subject,days,startTime,endTime,chimeStart,chimeEnd}]}</code></li>
+              <li><code class="mono">POST /api/schedule</code> (JSON) → <code class="mono">{status:"ok"}</code></li>
+              <li><code class="mono">GET /api/attendance</code> → CSV <code class="mono">Timestamp,MAC_Address,RSSI,Status</code></li>
+              <li><code class="mono">GET /api/attendance/status</code> → <code class="mono">{active:bool}</code></li>
+              <li><code class="mono">GET /ring?file=name.wav</code> → queues chime → <code class="mono">{status:"ok"}</code> (<code class="mono">404</code> if the WAV is not on SD; legacy <code class="mono">.mp3</code> names auto-map to <code class="mono">.wav</code>)</li>
+              <li><code class="mono">GET /api/audio/list</code> → <code class="mono">{files:[{name,size}]}</code></li>
+              <li><code class="mono">POST /api/audio/upload</code> (multipart <code class="mono">.wav</code> ≤300KB) → <code class="mono">{status:"ok",name,size}</code></li>
+              <li><code class="mono">POST /api/time/sync</code> → NTP sync RTC (needs STA online) → <code class="mono">{status:"ok",time}</code></li>
+              <li><code class="mono">GET /api/config</code> → <code class="mono">{ap_ssid,sta_ssid,sta_pass}</code></li>
+              <li><code class="mono">POST /api/config</code> (JSON) → <code class="mono">{status:"ok"}</code></li>
+              <li><code class="mono">POST /handleLogin</code> (urlencoded) → <code class="mono">{status:"ok"}</code> + session cookie</li>
+              <li><code class="mono">GET /logout</code> → expires session, redirects to <code class="mono">/</code></li>
+              <li><code class="mono">GET /test</code> → connectivity check</li>
+            </ul>
+          </div>
+        </section>
+        <section class="table-section">
+          <h2>Frequently Asked Questions</h2>
+          <div class="manual-card"><h3>Can I change the bell audio?</h3><p>Yes — upload a 16-bit mono <code class="mono">.wav</code> (≤300KB) via System Controls, then pick its file name in the schedule form (stored as <code class="mono">/audio/&lt;name&gt;</code>). No SD card removal needed.</p></div>
+          <div class="manual-card"><h3>Why do my schedules not ring on some days?</h3><p>Check the day checkboxes — the firmware only fires entries whose <code class="mono">days[]</code> bitmask matches the RTC weekday.</p></div>
+        </section>
+      </section>
+
+      <!-- Settings (local only) -->
+      <section class="view-section" id="settings-view">
+        <section class="page-title"><h2>Settings</h2><p>Local browser preferences only — no firmware endpoint</p></section>
+        <section class="table-section">
+          <h2>Account Settings</h2>
+          <form id="settings-form" class="schedule-form">
+            <div class="settings-group">
+              <h3>Profile Information</h3>
+              <div class="settings-avatar">
+                <img id="settings-avatar-preview" src="pfp.jpg" alt="Profile preview" />
+                <div><input type="file" id="settings-avatar" accept="image/*" /><p class="message">Choose a new profile picture.</p></div>
+              </div>
+              <div class="form-row"><input type="text" id="settings-display-name" placeholder="Display name" /></div>
+            </div>
+            <div class="settings-group">
+              <h3>Preferences</h3>
+              <div class="form-row">
+                <select id="settings-appearance" aria-label="Appearance"><option value="light">Light mode</option><option value="dark">Dark mode</option></select>
+                <select id="settings-default-period" aria-label="Default schedule period"><option value="AM">AM</option><option value="NN">NN</option><option value="PM">PM</option></select>
+              </div>
+            </div>
+            <div class="form-actions"><button type="submit">Save Settings</button></div>
+          </form>
+          <p id="settings-message" class="message"></p>
+        </section>
+      </section>
+    </main>
+  </section>
+  <script src="script.js"></script>
+</body>
+</html>

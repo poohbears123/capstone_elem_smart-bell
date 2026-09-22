@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FCU Smart Bell - Login</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Self-contained fallback so this page renders even if style.css is missing */
+    *{margin:0;padding:0;box-sizing:border-box;font-family:Arial,Helvetica,sans-serif;}
+    body{background:#0b2c75;}
+    .login-page{height:100vh;display:flex;justify-content:center;align-items:center;overflow:hidden;position:relative;background:#0b2c75;}
+    .background{position:absolute;width:100%;height:80%;background:url(building.jpg);background-size:cover;opacity:0.95;}
+    .login-container{position:relative;width:630px;max-width:95%;background:#f5f5f5;padding:40px;border-radius:4px;z-index:10;box-shadow:0 10px 30px rgba(0,0,0,0.2);}
+    .logo-section{text-align:center;margin-bottom:20px;}
+    .logo-section img{width:250px;max-width:100%;}
+    .portal-title{background:#ff4d00;color:#fff;font-size:32px;font-weight:bold;text-align:center;padding:18px;border-radius:0 0 80px 0;margin-bottom:30px;}
+    .input-group{margin-bottom:20px;}
+    .input-group input{width:100%;padding:16px;border:1px solid #d6d6d6;background:#fff;font-size:18px;border-radius:3px;outline:none;}
+    .input-group input:focus{border-color:#0b2c75;}
+    .login-btn{width:100%;background:#13278f;color:#fff;border:none;padding:16px;font-size:22px;font-weight:bold;cursor:pointer;border-radius:3px;}
+    .login-btn:hover{background:#0b1f6d;}
+    .login-error{color:#b00020;font-weight:700;text-align:center;min-height:22px;margin:0 0 8px;font-size:14px;}
+    .login-note{text-align:center;color:#64748b;font-size:13px;margin-top:12px;}
+    @media(max-width:900px){.login-container{padding:25px;}.portal-title{font-size:24px;}}
+  </style>
+</head>
+<body>
+  <section class="login-page">
+    <div class="background"></div>
+    <div class="login-container">
+      <div class="logo-section"><img src="FCU.jpg" alt="Logo" /></div>
+      <div class="portal-title">FCU ELEMENTARY<center>SCHOOL BELL SYSTEM</center></div>
+      <form id="login-form" autocomplete="off">
+        <div class="input-group"><input type="text" id="login-username" placeholder="Username" required /></div>
+        <div class="input-group"><input type="password" id="login-password" placeholder="Password" required /></div>
+        <p id="login-message" class="login-error"></p>
+        <button type="submit" class="login-btn">SIGN IN</button>
+      </form>
+      <p class="login-note">Authenticates via <code>POST /handleLogin</code> on the device.</p>
+    </div>
+  </section>
+  <script>
+    // Standalone login: POST urlencoded creds, follow session on success.
+    document.getElementById('login-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var u = document.getElementById('login-username').value.trim();
+      var p = document.getElementById('login-password').value;
+      var m = document.getElementById('login-message');
+      if (!u || !p) { m.textContent = 'Enter username and password.'; return; }
+      m.textContent = 'Signing in...';
+      try {
+        var res = await fetch('/handleLogin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: 'username=' + encodeURIComponent(u) + '&password=' + encodeURIComponent(p)
+        });
+        if (res.ok) { window.location.href = '/'; return; }
+        m.textContent = (res.status === 423)
+          ? 'Locked after too many attempts. Try again in a minute.'
+          : 'Invalid username or password.';
+      } catch (err) {
+        m.textContent = 'Network error. Please check your connection.';
+      }
+    });
+  </script>
+</body>
+</html>
