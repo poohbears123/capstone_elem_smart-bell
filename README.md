@@ -1,320 +1,237 @@
-# capstone_elem_smart-bell — v1.7
+# FCU Smart Bell System
 
-The **latest release** of the FCU Smart Bell system.
+ESP32-based smart school bell and attendance monitoring system for FCU Elementary. The firmware is implemented in the Arduino/ESP32 environment and runs as a multi-task FreeRTOS application with a web dashboard, RTC and NTP timing, WiFi management, I2S audio playback, and attendance detection.
 
-## What's New in v1.7
+Current firmware version: `2.2.0`
 
-### I2S Audio via MAX98357A Amplifier
-Replaced the simple GPIO-based bell mechanism with a full I2S audio driver for the **MAX98357A Class D amplifier**. The system now generates audio tones through an external speaker using:
-- **BCLK** (GPIO 26), **LRC** (GPIO 27), **DIN** (GPIO 25)
-- 16-bit, 16kHz mono audio playback
-- `i2sPlayTone()` — plays a configurable frequency tone for a given duration
-- `triggerPhysicalBell()` — dispatches a bell ring with 1-second or multi-pulse pattern (500ms on / 100ms off)
-- `setupI2S()` — initializes the I2S driver with DMA buffers on boot
+## Project Overview
 
-### SD Card Support for UI Files
-The web UI (`login.html`, `dashboard.html`) is now served from an **SD card** (CS pin GPIO 5) instead of SPIFFS, enabling larger, richer HTML pages. The `streamSDFile()` helper automatically falls back to SPIFFS if the SD card is unavailable.
+This project combines:
 
-### Completely Redesigned Login Page (`ui/login.html`)
-A polished, professional login interface featuring:
-- **FCU logo** image displayed prominently
-- **Building background** overlay photo
-- **Portal title bar** — "FCU ELEMENTARY SCHOOL BELL SYSTEM" with orange accent
-- **Styled input fields** — larger, cleaner design
-- **reCAPTCHA placeholder** text
-- **SIGN IN button** — dark blue with hover effect
-- **Footer link** — "Don't have an account? Sign Here"
-- **Fetch-based login** — the form now uses JavaScript `fetch()` to POST credentials, then handles 401 (invalid), 423 (locked), and 303 (success) responses client-side — no page reload on error
-- **Modal error popup** — styled error dialog with OK button for invalid credentials
+- ESP32 web server and API
+- RTC-based bell schedule engine
+- I2S audio playback through MAX98357A
+- WiFi access point + station mode configuration
+- SD card and SPIFFS data storage
+- Passive attendance monitoring using WiFi probe requests
+- Session-based authentication for the web dashboard
+- Activity/event logging to persistent storage
 
-### Completely Redesigned Dashboard (`ui/dashboard.html`)
-A modern, sidebar-based dashboard with multiple views:
+## What Changed in This Update
 
-| View | Description |
-|---|---|
-| **Dashboard** | Telemetry cards (Device Time, Next Bell, Network Status, Connected SSID), System Controls (Manual Override, Emergency Detection, Ring Bell 3s), bell schedule table with Edit/Delete |
-| **Schedule** | Read-only bell timetable with Next Bell and Scheduled Events counters |
-| **User Management** | Static staff account table (Name, Role, Status, Last Login, Actions) |
-| **Activity Logs** | Security logs textarea with Refresh and Upload (file picker) buttons |
-| **Network Settings** | WiFi config form (AP SSID, Station SSID/Password) with Save & Sync Time button |
-| **Manual** | Quick-start guide, FAQ cards, API reference list |
+This README was updated to reflect the current implementation instead of the older v1.7 documentation notes. The system has evolved into a more complete smart bell platform.
 
-### Schedule Modal with Time-Dial Spinners
-Added an interactive **time-picker modal** for schedule CRUD operations:
-- **Hour spinner** (1–12) with smooth scrolling
-- **Minute spinner** (00–59) with smooth scrolling
-- **AM/PM toggle buttons** with active state highlighting
-- Live preview of the selected 24-hour time
-- Works for both Add and Edit operations
+### 1. Firmware architecture is now FreeRTOS-based
+The latest firmware uses multiple tasks for separate responsibilities:
 
-### Improved Login Error Handling
-- 401 responses show a **styled modal dialog** on the login page (no more fallback HTML page)
-- 423 (lockout) responses show a "temporarily locked" message
-- Network errors show a user-friendly message
-- The login page stays intact on failure — no page redirect
+- `vWebTask` handles the HTTP web dashboard and API
+- `vSnifferTask` monitors WiFi probe frames for attendance capture
+- `vAudioTask` manages I2S audio playback and bell queueing
+- `vSystemEngineTask` handles RTC/NTP, schedule evaluation, and system timing
 
-### Expanded System Controls
-- **Manual Override button** — triggers a manual override event
-- **Emergency Detection button** — activates emergency alert mode
-- **Ring Bell (3s) button** — triggers a physical bell ring via I2S audio
+This makes the project much more stable and easier to expand than a single-loop Arduino sketch.
 
-### Other Enhancements
-- **Sidebar navigation** with role display (`SuperAdmin`, `Admin`, `User`)
-- **Sign Out button** in sidebar footer
-- **Logs view** automatically fetches on navigation to Activity Logs
-- **15-second auto-refresh** interval for logs
-- **5-second telemetry polling** for live dashboard updates
-- **Upload log file** functionality with file picker in Activity Logs
-- **README updated** to document all v1.7 features
+### 2. Real I2S audio playback is implemented
+The audio system uses the MAX98357A amplifier and ESP32 I2S driver.
 
-## Event Logging Coverage
+- `I2S_LRC_PIN = 27`
+- `I2S_BCLK_PIN = 26`
+- `I2S_DIN_PIN = 25`
+- Audio files are read from SD and played as WAV data
+- Large buffering is avoided to stay memory-friendly on ESP32
+- Bell events can be triggered by schedule time, manual action, or emergency audio
 
-`logSecurityEvent()` logs ALL system events:
+### 3. SD card storage is now a primary runtime storage system
+The current code uses SD for the main UI and data files, with SPIFFS as a fallback or helper storage layer.
 
-| Event | Description |
-|---|---|
-| `SYSTEM_BOOT` | System startup |
-| `WIFI_CONNECTION_STARTED_SSID_xxx` | WiFi connection initiated |
-| `WIFI_CONNECTED_SSID_xxx` | WiFi connection successful |
-| `WIFI_CONNECTION_TIMEOUT_SSID_xxx` | WiFi connection timed out |
-| `NTP_SYNC_SUCCESS_SSID_xxx` | NTP time sync succeeded |
-| `NTP_SYNC_TIMEOUT_SSID_xxx` | NTP time sync failed |
-| `FAILED_LOGIN: USERNAME_xxx` | Failed login attempt |
-| `BRUTE_FORCE_LOCKOUT_TRIGGERED` | Lockout activated after max attempts |
-| `LOCKOUT_ACTIVE_REJECTED_LOGIN_ATTEMPT` | Rejected attempt during lockout |
-| `SESSION_TIMED_OUT` | User session expired |
-| `USER_LOGOUT` | User logged out |
-| `SUCCESSFUL_LOGIN` | Successful authentication |
-| `ADDED_SCHEDULE_xx:xx` | Bell schedule added |
-| `REMOVED_SCHEDULE_xx:xx` | Bell schedule deleted |
-| `EDITED_SCHEDULE_FROM_x_TO_y` | Bell schedule edited |
-| `UPDATED_NETWORK_CONFIG` | Network settings saved |
-| `TRIGGERED_MANUAL_BELL` | Manual bell triggered |
-| `SCHEDULE_TRIGGERED_AT_xx:xx` | Automated schedule bell fired |
+- UI pages served from `SD:/ui/...`
+- Schedule stored in `SD:/data/schedule.json`
+- Activity logs stored in `SD:/data/activity.csv`
+- Network config saved to SPIFFS at `/config.json`
 
-## Hardware Pin Configuration
+### 4. Attendance monitoring is active in the firmware
+The sniffer task monitors management frames and records device probe requests when attendance mode is enabled.
+
+- Tracks MAC address, RSSI, and timestamp
+- Deduplicates repeated events
+- Saves results to `/data/logs.csv`
+- Exposes attendance data via `/api/attendance` and `/api/attendance/status`
+
+### 5. RTC + NTP time syncing is built in
+Time is kept by a DS3231 RTC and synchronized to NTP when the ESP32 is connected to WiFi.
+
+- `NTP_TZ_OFFSET_SEC = 28800` for Asia/Manila time
+- Automatic retry schedule for station connectivity
+- Time is used for bell scheduling and event timestamps
+
+### 6. Login and web auth are session-based
+The dashboard uses cookie-based authentication with a derived session token.
+
+- Cookie name: `FCU_SESS`
+- Default credentials are set in firmware as:
+  - Username: `admin`
+  - Password: `admin123`
+- The system checks auth per route using `isAuthed()` and `guard()`
+
+### 7. API routes now match the running application
+The project exposes a modern set of endpoints for telemetry, schedule management, attendance data, activity log retrieval, and network configuration.
+
+## System Diagram
+
+```text
+                         ┌──────────────────────────────┐
+                         │        Browser / Client      │
+                         │  login page + dashboard UI   │
+                         └──────────────┬───────────────┘
+                                        │ HTTP
+                                        ▼
+                         ┌──────────────────────────────┐
+                         │        ESP32 Firmware        │
+                         │   AsyncWebServer + FreeRTOS  │
+                         │                              │
+                         │  ┌──────────────────────┐    │
+                         │  │ Web / Auth Layer     │    │
+                         │  │ /, /handleLogin      │    │
+                         │  │ /api/telemetry       │    │
+                         │  │ /api/config          │    │
+                         │  │ /api/schedule        │    │
+                         │  │ /api/activity        │    │
+                         │  └──────────────────────┘    │
+                         │                              │
+                         │  ┌──────────────────────┐    │
+                         │  │ Timing + Schedule    │    │
+                         │  │ RTC + NTP + engine   │    │
+                         │  │ Bell trigger logic   │    │
+                         │  └──────────────────────┘    │
+                         │                              │
+                         │  ┌──────────────────────┐    │
+                         │  │ Audio + Storage      │    │
+                         │  │ I2S MAX98357A        │    │
+                         │  │ SD card + SPIFFS     │    │
+                         │  │ WAV chime playback   │    │
+                         │  └──────────────────────┘    │
+                         │                              │
+                         │  ┌──────────────────────┐    │
+                         │  │ Attendance Monitor   │    │
+                         │  │ WiFi probe sniffer  │    │
+                         │  │ RSSI + MAC capture   │    │
+                         │  └──────────────────────┘    │
+                         └──────────────┬───────────────┘
+                                        │
+                                        ▼
+                         ┌──────────────────────────────┐
+                         │      External Components     │
+                         │  - MAX98357A Speaker         │
+                         │  - DS3231 RTC                │
+                         │  - WiFi AP / Station         │
+                         │  - SD storage               │
+                         │  - Probe-request devices    │
+                         └──────────────────────────────┘
+```
+
+## Hardware Configuration
 
 | Component | Pin | Description |
 |---|---|---|
-| MAX98357A DIN | GPIO 25 | Audio data output |
-| MAX98357A BCLK | GPIO 26 | Bit clock |
-| MAX98357A LRC | GPIO 27 | Left/Right clock (Word select) |
-| SD Card CS | GPIO 5 | Chip select for SD card |
-| RTC DS3231 | I2C (SDA/SCL) | Real-time clock |
+| SD CS | GPIO 5 | SD card chip select |
+| SD SCK | GPIO 18 | SD clock |
+| SD MISO | GPIO 19 | SD data in |
+| SD MOSI | GPIO 23 | SD data out |
+| I2S DIN | GPIO 25 | Audio data |
+| I2S BCLK | GPIO 26 | Audio bit clock |
+| I2S LRC | GPIO 27 | Audio word clock |
+| I2C SDA | GPIO 21 | RTC communication |
+| I2C SCL | GPIO 22 | RTC communication |
+| PTT Button | GPIO 14 | Manual or trigger input |
+| CALL Alert | GPIO 13 | Alert output/use |
 
-## Prerequisites
+## Core Features
 
-Ensure the following directories and files are available:
+- Smart bell schedule engine with RTC-driven timing
+- Manual bell trigger and emergency audio path
+- Network configuration through the web UI
+- Web dashboard served from the device itself
+- File uploads and chime management from the dashboard
+- Automatic or manual NTP synchronization
+- Attendance detection using WiFi management frames
+- Logging of system events and activity history
 
-- `/ui/dashboard.html` (SD card or SPIFFS)
-- `/ui/login.html` (SD card or SPIFFS)
-- `/data/config.txt`
-- `/data/schedule.txt`
+## Project Structure
 
-If `/data/` is missing, the ESP32 will auto-generate it in SPIFFS `/root` directory.
-
-## Frontend to Backend Integration
-
-The frontend (HTML/JS files on the SD card) communicates with the backend (ESP32 firmware) entirely over HTTP.
-
-### 1. Serving the Pages
-
-When you connect to the ESP32 (either via its AP `FCU_Secure_Bell` or its station IP), the firmware's `WebServer` handles requests:
-
-```cpp
-server.on("/", []() {
-  String userRole = checkSessionRole();
-  if (userRole == "Guest") {
-    // Serve login page from SD card
-    if (!streamSDFile("/ui/login.html", "text/html"))
-      server.send(200, "text/html", fallbackLoginPage());
-  } else {
-    // Serve dashboard from SD card
-    if (!streamSDFile("/ui/dashboard.html", "text/html"))
-      server.send(404, "text/plain", "Error: /ui/dashboard.html missing from SD Card.");
-  }
-});
+```text
+capstone2.1P/
+├── README.md
+├── audio/
+├── capstone2.1.0P/
+│   └── capstone2.1.0P.ino
+├── data/
+│   ├── logs.csv
+│   └── schedule.json
+├── new UI/
+│   ├── activity-logs.html
+│   ├── app.js
+│   ├── index.html
+│   ├── manual.html
+│   ├── schedule.html
+│   ├── style.css
+│   └── user-management.html
+├── ui/
+│   ├── index.html
+│   ├── login.html
+│   ├── script.js
+│   └── style.css
+└── .gitignore
 ```
 
-**Flow:** Browser → HTTP GET `/` → ESP32 reads `login.html` or `dashboard.html` from SD card → sends HTML back to browser.
+## Web API Summary
 
-### 2. Session Authentication (Cookie-based)
-
-The backend tracks logged-in users with **HTTP-only cookies**:
-
-| Step | What Happens |
-|---|---|
-| **Login** | Browser POSTs username+password to `/handleLogin` → ESP validates via MD5 hash → creates a server-side session → sets `Set-Cookie: ESPSESSIONID=<random_token>; Path=/; HttpOnly` response header |
-| **Fetch-based login (v1.7)** | The login page intercepts form submit with `fetch()`, handles 401/423/303 responses client-side, shows modal on error, redirects on success |
-| **Subsequent requests** | Browser automatically sends `Cookie: ESPSESSIONID=<token>` with every request → `checkSessionRole()` reads the cookie, looks up the session, returns the role (`SuperAdmin`, `Admin`, `User`, or `Guest`) |
-| **Logout** | `/logout` clears the cookie and invalidates the session |
-| **Timeout** | Sessions expire after 10 minutes (`SESSION_TIMEOUT = 600000ms`) of inactivity |
-
-### 3. API Calls from Dashboard JavaScript
-
-The dashboard (`ui/dashboard.html`) uses `fetch()` to call backend API endpoints.
-
-#### `loadTelemetry()` — Polling device status
-```javascript
-// Called on page load, then every 5 seconds via setInterval()
-async function loadTelemetry() {
-  const res = await fetch('/api/telemetry', { cache: 'no-store' });
-  if (!res.ok) { window.location.href = '/'; return; }
-  const data = await res.json();
-  // Update UI: time, status, SSID, role pill
-}
-```
-
-#### `loadConfig()` — Pre-populate network fields
-```javascript
-async function loadConfig() {
-  const res = await fetch('/api/config', { cache: 'no-store' });
-  const data = await res.json();
-  document.getElementById('ap_name').value = data.ap_ssid || '';
-  document.getElementById('station_ssid').value = data.sta_ssid || '';
-  document.getElementById('station_pass').value = data.sta_pass || '';
-}
-```
-
-#### `saveNetwork()` — Save WiFi settings
-```javascript
-async function saveNetwork() {
-  const res = await fetch('/saveNetwork', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'ap_name=...&station_ssid=...&station_pass=...'
-  });
-  const data = await res.json();
-  msg.textContent = data.message; // "Network config saved. Attempting connection..."
-}
-```
-
-#### `refreshSchedules()` — Load bell schedule
-```javascript
-async function refreshSchedules() {
-  const res = await fetch('/api/schedules', { cache: 'no-store' });
-  const list = await res.json();
-  // Render table rows with Edit/Delete buttons
-}
-```
-
-#### Schedule CRUD operations
-```javascript
-// Add schedule (via modal)
-await fetch('/addSchedule', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-  body: 'sched_time=' + encodeURIComponent('08:00')
-});
-
-// Edit schedule (via modal)
-await fetch('/editSchedule', {
-  method: 'POST',
-  body: 'index=0&sched_time=' + encodeURIComponent('09:00')
-});
-
-// Delete schedule
-await fetch('/deleteSchedule', {
-  method: 'POST',
-  body: 'index=' + encodeURIComponent(index)
-});
-```
-
-#### `ringBell()` — Trigger manual bell via I2S audio
-```javascript
-async function ringBell() {
-  const res = await fetch('/ring', { method: 'GET' });
-  if (!res.ok) { msg.textContent = 'Failed (not authorized?)'; return; }
-  msg.textContent = 'Bell Dispatched.';
-}
-```
-
-#### `refreshLogs()` — Fetch security logs
-```javascript
-async function refreshLogs() {
-  const res = await fetch('/backend/logs', { cache: 'no-store' });
-  const text = await res.text();
-  document.getElementById('logs').value = text || '';
-}
-```
-
-### 4. Login Form Submission (v1.7 Fetch-based)
-
-The login page (`ui/login.html`) now uses JavaScript `fetch()` instead of HTML form POST:
-
-```javascript
-document.getElementById('login-form').addEventListener('submit', async function(e) {
-  e.preventDefault();
-  const res = await fetch('/handleLogin', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'username=' + encodeURIComponent(username) + '&password=' + encodeURIComponent(password)
-  });
-  // 401 → showModal('Invalid username or password')
-  // 423 → showModal('Account temporarily locked...')
-  // 303 → window.location.href = location header
-});
-```
-
-### 5. Error Handling & Redirects
-
-| Status Code | Meaning | Frontend Reaction |
+| Endpoint | Method | Notes |
 |---|---|---|
-| **403** | `Guest` (not logged in) trying to access a protected endpoint | Dashboard redirects to `/` (login) |
-| **423** | Account is locked out due to brute-force protection | ESP returns lockout page |
-| **303** | Successful login/logout | Browser follows redirect to `/` |
-| **401** | Login failed | ESP returns 401, login page shows fetch()-handled error modal (no page reload) |
+| `/` | GET | Serves the login page or dashboard |
+| `/test` | GET | Basic health check |
+| `/api/telemetry` | GET | Returns device time, network state, attendance and schedule info |
+| `/api/config` | GET | Reads saved network config |
+| `/api/config` | POST | Saves and applies WiFi configuration |
+| `/api/schedule` | GET | Returns JSON schedule |
+| `/api/schedule` | POST | Saves schedule changes |
+| `/api/attendance` | GET | Returns captured attendance CSV |
+| `/api/attendance/status` | GET | Returns active/inactive status |
+| `/api/activity` | GET | Returns recent activity events |
+| `/api/time/sync` | POST | Manually sync RTC from NTP |
+| `/handleLogin` | POST | Authenticates user and sets session cookie |
+| `/logout` | GET | Clears authentication |
+| `/ring` | GET | Trigger a bell ring |
 
-### 6. The Data Files
+## Authentication and Security
 
-| File | Read by | Written by | Purpose |
-|---|---|---|---|
-| `data/config.txt` | `loadConfiguration()` on boot | `/saveNetwork` endpoint | Persists AP SSID, station SSID, station password |
-| `data/schedule.txt` | `loadSchedules()` on boot | `/addSchedule`, `/editSchedule`, `/deleteSchedule` endpoints | Persists bell schedule times |
-| `data/security_log.txt` | `/backend/logs` endpoint | `logSecurityEvent()` | Persists all security/system events |
+The web app uses a cookie-based session scheme.
 
-### Summary Diagram
+- Cookie name: `FCU_SESS`
+- Token generation is based on a deterministic SHA1 value derived from the username, password, and remote client IP
+- Protected routes call `guard()` before allowing access
+- Failed login attempts are counted and can temporarily lock the account
+- All important events are logged and persisted to `/data/activity.csv`
 
-```
-┌──────────────────────┐         HTTP          ┌───────────────────────────┐
-│   Browser (Client)   │ ◄──────────────────►   │    ESP32 (Server/Self)    │
-│                      │                        │                           │
-│  ui/login.html       │   GET /                │  WebServer (port 80)      │
-│  ui/dashboard.html   │   POST /handleLogin    │  SD Card + SPIFFS         │
-│                      │   GET /api/telemetry   │  - reads HTML files       │
-│  JavaScript (fetch)  │   GET /api/config      │  - reads/writes data/     │
-│  - loadTelemetry()   │   POST /saveNetwork    │  - reads/writes logs      │
-│  - loadConfig()      │   GET /api/schedules   │                           │
-│  - saveNetwork()     │   POST /addSchedule    │  I2S Audio (MAX98357A)    │
-│  - refreshSchedules()│   POST /editSchedule   │  - triggerPhysicalBell()  │
-│  - ringBell()        │   POST /deleteSchedule │  - i2sPlayTone()          │
-│  - refreshLogs()     │   GET /ring            │                           │
-│                      │   GET /backend/logs    │  Session Manager          │
-│  Cookie:             │   GET /backend/logs/   │  - in-memory sessions[]   │
-│  ESPSESSIONID=xxx    │        upload          │  - ESPSESSIONID cookie    │
-│                      │   GET /logout          │  - 10-minute timeout      │
-│                      │                        │                           │
-│  fetch()-based       │                        │  RTC + NTP                │
-│  login (no reload)   │                        │  - time tracking          │
-│                      │                        │                           │
-└──────────────────────┘                        └───────────────────────────┘
-```
+## Data Files
 
-## API Endpoints
+| File | Purpose |
+|---|---|
+| `/config.json` | Saved AP and station WiFi settings in SPIFFS |
+| `/data/schedule.json` | Bell schedule data |
+| `/data/logs.csv` | Attendance/probe log records |
+| `/data/activity.csv` | Activity and event log |
 
-| Endpoint | Method | Auth Required | Description |
-|---|---|---|---|
-| `/` | GET | Cookie (session) | Serves login or dashboard |
-| `/api/telemetry` | GET | Cookie (session) | Device time, status, SSID, AP SSID, role |
-| `/api/config` | GET | Cookie (session) | Network configuration |
-| `/api/schedules` | GET | Cookie (session) | Bell schedule list |
-| `/handleLogin` | POST | None | Username/password authentication |
-| `/saveNetwork` | POST | Cookie (session) | Save WiFi config and connect |
-| `/addSchedule` | POST | Cookie (session) | Add a bell schedule time |
-| `/editSchedule` | POST | Cookie (session) | Edit an existing schedule |
-| `/deleteSchedule` | POST | Cookie (session) | Delete a schedule |
-| `/ring` | GET | Cookie (session) | Trigger manual bell (3s) via I2S audio |
-| `/backend/logs` | GET | SuperAdmin | View security logs |
-| `/backend/logs/upload` | POST | SuperAdmin | Upload/replace security logs |
-| `/logout` | GET | Cookie (session) | End session |
+## Deployment Notes
+
+Before deploying to a real device:
+
+1. Change the AP password from the default value in the firmware.
+2. Change the admin username/password if needed.
+3. Ensure the SD card contains the required UI files in `/ui/`.
+4. Verify the `MAX98357A` speaker wiring and RTC wiring are correct.
+5. Confirm WiFi credentials for station mode are valid.
+
+## Conclusion
+
+The system is now a practical smart bell controller with a web-based admin dashboard, scheduled bell logic, live attendance monitoring, dynamic WiFi configuration, RTC/NTP synchronization, and audio management. The current README reflects the actual codebase and the current v2.2.0 feature set.
 
