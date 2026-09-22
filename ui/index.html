@@ -191,19 +191,18 @@
 
       <!-- Activity Logs (static: no /backend/logs in firmware) -->
       <section class="view-section" id="activity-view">
-        <section class="page-title"><h2>Activity Logs</h2><p>Static demo — for live device detections open Attendance (<code class="mono">GET /api/attendance</code>)</p></section>
+        <section class="page-title"><h2>Activity Logs</h2><p>Live from <code class="mono">GET /api/activity</code> — newest first, persisted to <code class="mono">SD:/data/activity.csv</code></p></section>
         <section class="cards">
-          <div class="card"><i class="fa-solid fa-list-check"></i><h3>Today's Actions</h3><p>18</p></div>
-          <div class="card"><i class="fa-solid fa-triangle-exclamation"></i><h3>Alerts</h3><p>2</p></div>
+          <div class="card"><i class="fa-solid fa-list-check"></i><h3>Events Logged</h3><p id="activity-count">--</p></div>
+          <div class="card"><i class="fa-solid fa-triangle-exclamation"></i><h3>Alerts</h3><p id="activity-alerts">--</p></div>
           <div class="card"><i class="fa-solid fa-rotate-right"></i><h3>Last Sync</h3><p id="last-sync-card">--</p></div>
         </section>
         <section class="table-section">
-          <h2>Recent Activity</h2>
-          <table><thead><tr><th>Time</th><th>Activity</th><th>Performed By</th><th>Status</th></tr></thead>
-          <tbody>
-            <tr><td>07:20 AM</td><td>Updated morning bell schedule</td><td>Maria Santos</td><td><span class="status-badge active">Success</span></td></tr>
-            <tr><td>06:45 AM</td><td>Manual bell test executed</td><td>John Cruz</td><td><span class="status-badge active">Success</span></td></tr>
-            <tr><td>06:10 AM</td><td>Low battery warning acknowledged</td><td>System</td><td><span class="status-badge pending">Needs Attention</span></td></tr>
+          <div class="section-heading"><h2>Recent Activity</h2><button type="button" id="refresh-activity-btn" class="secondary-btn">Refresh</button></div>
+          <p id="activity-message" class="message"></p>
+          <table><thead><tr><th>Time</th><th>Event</th><th>Status</th></tr></thead>
+          <tbody id="activity-body">
+            <tr><td colspan="3" class="empty-state">Loading...</td></tr>
           </tbody></table>
         </section>
       </section>
@@ -234,6 +233,7 @@
               <li><code class="mono">GET /api/audio/list</code> → <code class="mono">{files:[{name,size}]}</code></li>
               <li><code class="mono">POST /api/audio/upload</code> (multipart <code class="mono">.wav</code> ≤300KB) → <code class="mono">{status:"ok",name,size}</code></li>
               <li><code class="mono">POST /api/time/sync</code> → NTP sync RTC (needs STA online) → <code class="mono">{status:"ok",time}</code></li>
+              <li><code class="mono">GET /api/activity?limit=N</code> → <code class="mono">{events:[{t,ev}],count}</code> (newest first)</li>
               <li><code class="mono">GET /api/config</code> → <code class="mono">{ap_ssid,sta_ssid,sta_pass}</code></li>
               <li><code class="mono">POST /api/config</code> (JSON) → <code class="mono">{status:"ok"}</code></li>
               <li><code class="mono">POST /handleLogin</code> (urlencoded) → <code class="mono">{status:"ok"}</code> + session cookie</li>

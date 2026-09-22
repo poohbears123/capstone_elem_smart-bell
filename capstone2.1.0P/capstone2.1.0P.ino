@@ -164,6 +164,48 @@ static void appendCSVLine(const char* line) {
   sdGive();
 }
 
+// Activity event log: RAM ring (fast serve) + SD append (persist).
+// WROOM-safe: 60 x ~88B ~= 5KB.
+#define ACT_FILE "/data/activity.csv"
+#define ACT_MAX 60
+#define ACT_EV_LEN 64
+typedef struct { char t[20]; char ev[ACT_EV_LEN]; } ActEntry_t;
+static ActEntry_t sActRing[ACT_MAX];
+static int sActHead = 0, sActCount = 0;
+static SemaphoreHandle_t xActMutex = NULL;
+
+static void actTimestamp(char* out, size_t n) {
+  if (rtcOK && xI2CMutex && xSemaphoreTake(xI2CMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+    DateTime d = rtc.now();
+    snprintf(out, n, "%04d-%02d-%02d %02d:%02d:%02d",
+             d.year(), d.month(), d.day(), d.hour(), d.minute(), d.second());
+    xSemaphoreGive(xI2CMutex);
+  } else {
+    snprintf(out, n, "uptime+%lus", (unsigned long)(millis() / 1000UL));
+  }
+}
+
+static void logEvent(const char* ev) {
+  if (!ev || !*ev) return;
+  char t[20]; actTimestamp(t, sizeof(t));
+  if (xActMutex && xSemaphoreTake(xActMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+    ActEntry_t* e = &sActRing[sActHead];
+    strlcpy(e->t, t, sizeof(e->t));
+    strlcpy(e->ev, ev, sizeof(e->ev));
+    sActHead = (sActHead + 1) % ACT_MAX;
+    if (sActCount < ACT_MAX) sActCount++;
+    xSemaphoreGive(xActMutex);
+  }
+  if (xSdMutex && sdTake()) {
+    File f = SD.open(ACT_FILE, FILE_APPEND);
+    if (f) {
+      f.print(t); f.print(","); f.print(ev); f.print("\n");
+      f.close();
+    }
+    sdGive();
+  }
+}
+
 static bool sdReadFile(const char* path, String& out) {
   if (!sdTake()) return false;
   File f = SD.open(path, FILE_READ);
@@ -245,7 +287,35 @@ void setup() {
   xI2CMutex = xSemaphoreCreateMutex();
   xScheduleMutex = xSemaphoreCreateMutex();
   xSdMutex = xSemaphoreCreateMutex();
+  xActMutex = xSemaphoreCreateMutex();
   Serial.println("[OK] Queues/mutexes.");
+
+  // Rotate activity log if grown past ~100KB (keeps SD writes bounded).
+  if (sdOK && sdTake()) {
+    File af = SD.open(ACT_FILE, FILE_READ);
+    if (af) {
+      if (af.size() > 102400UL) {
+        af.close();
+        SD.remove("/data/activity.prev");
+        SD.rename(ACT_FILE, "/data/activity.prev");
+        File nf = SD.open(ACT_FILE, FILE_WRITE);
+        if (nf) { nf.print("Timestamp,Event\n"); nf.close(); }
+        Serial.println("[Activity] rotated (>100KB)");
+      } else {
+        bool empty = (af.size() == 0);
+        af.close();
+        if (empty) {
+          File nf = SD.open(ACT_FILE, FILE_WRITE);
+          if (nf) { nf.print("Timestamp,Event\n"); nf.close(); }
+        }
+      }
+    } else {
+      File nf = SD.open(ACT_FILE, FILE_WRITE);
+      if (nf) { nf.print("Timestamp,Event\n"); nf.close(); }
+    }
+    sdGive();
+  }
+  logEvent("SYSTEM_BOOT");
 
   memset(lastFiredStart, 0, sizeof(lastFiredStart));
   memset(lastFiredEnd, 0, sizeof(lastFiredEnd));
@@ -526,6 +596,9 @@ bool syncRTCfromNTP(uint32_t timeoutMs) {
            dt.year(), dt.month(), dt.day(), dt.hour(), dt.minute(), dt.second());
   gNtpOK = true;
   Serial.printf("[NTP] RTC synced: %s\n", gLastNtpSync);
+  char ntpLog[ACT_EV_LEN];
+  snprintf(ntpLog, sizeof(ntpLog), "NTP_SYNC %s", gLastNtpSync);
+  logEvent(ntpLog);
   return true;
 }
 
@@ -578,6 +651,9 @@ void vSystemEngineTask(void* pvParameters) {
             xQueueSend(xAudioQueue, &m, 0);
             attendanceActive = true;
             enableSniffer(true);      // sniff during this window only
+            char fLog[ACT_EV_LEN];
+            snprintf(fLog, sizeof(fLog), "SCHEDULE_FIRED id=%d", scheduleEntries[i].id);
+            logEvent(fLog);
           }
           if (secs == es && lastFiredEnd[i] != dayStart + es) {
             lastFiredEnd[i] = dayStart + es;
@@ -597,6 +673,10 @@ void vSystemEngineTask(void* pvParameters) {
     {
       uint32_t n = millis();
       static bool firstNtpDone = false;
+      static bool prevStaUp = false;
+      bool staUp = (WiFi.status() == WL_CONNECTED);
+      if (staUp && !prevStaUp) logEvent("WIFI_STA_CONNECTED");
+      prevStaUp = staUp;
       uint32_t due = firstNtpDone ? NTP_RETRY_MS : 30000UL;
       if (WiFi.status() == WL_CONNECTED && (n - sLastNtpAttempt) >= due) {
         sLastNtpAttempt = n;
@@ -838,6 +918,7 @@ void handleConfigPost(AsyncWebServerRequest* r, uint8_t* data, size_t len,
     WiFi.begin(staSSID, staPass);
   }
   Serial.printf("[HTTP] netconfig saved AP=%s STA=%s\n", apSSID, staSSID);
+  logEvent("NETCONFIG_SAVE");
   r->send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
@@ -873,6 +954,7 @@ void handleSchedulePost(AsyncWebServerRequest* r, uint8_t* data, size_t len,
     return;
   }
   saveScheduleToSD(doc);                    // sets reload flag only
+  logEvent("SCHEDULE_SAVE");
   r->send(200, "application/json", "{\"status\":\"ok\"}");
 }
 
@@ -1035,6 +1117,29 @@ void setupWebServer(void) {
             "{\"active\":" + String(attendanceActive ? "true" : "false") + "}");
   });
 
+  // --- Activity log: newest-first JSON from RAM ring (persisted to SD:/data/activity.csv) ---
+  server.on("/api/activity", HTTP_GET, [](AsyncWebServerRequest* r) {
+    if (!guard(r)) return;
+    int limit = 60;
+    if (r->hasParam("limit")) {
+      limit = r->getParam("limit")->value().toInt();
+      if (limit < 1) limit = 1;
+      if (limit > ACT_MAX) limit = ACT_MAX;
+    }
+    String j = "{\"events\":[";
+    if (xActMutex && xSemaphoreTake(xActMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+      int n = sActCount < limit ? sActCount : limit;
+      for (int k = 0; k < n; k++) {
+        int idx = (sActHead - 1 - k + ACT_MAX * 2) % ACT_MAX;
+        if (k > 0) j += ",";
+        j += "{\"t\":\"" + String(sActRing[idx].t) + "\",\"ev\":\"" + String(sActRing[idx].ev) + "\"}";
+      }
+      xSemaphoreGive(xActMutex);
+    }
+    j += "],\"count\":" + String(sActCount) + "}";
+    r->send(200, "application/json", j);
+  });
+
   // --- Manual NTP sync: POST /api/time/sync (authed, needs STA online) ---
   server.on("/api/time/sync", HTTP_POST, [](AsyncWebServerRequest* r) {
     if (!guard(r)) return;
@@ -1069,6 +1174,7 @@ void setupWebServer(void) {
       resp->addHeader("Cache-Control", "no-cache");
       r->send(resp);
       Serial.printf("[HTTP] login ok from %s\n", r->client()->remoteIP().toString().c_str());
+      logEvent("LOGIN_OK");
     } else {
       gLoginFails++;
       Serial.printf("[HTTP] login fail #%d from %s\n",
@@ -1077,6 +1183,7 @@ void setupWebServer(void) {
         gLoginFails = 0;
         gLockUntil = millis() + LOGIN_LOCK_MS;
         r->send(423, "application/json", "{\"error\":\"locked, try later\"}");
+        logEvent("LOCKOUT");
       } else {
         r->send(401, "application/json", "{\"error\":\"invalid credentials\"}");
       }
@@ -1085,6 +1192,7 @@ void setupWebServer(void) {
 
   // --- Logout: expire the session cookie ---
   server.on("/logout", HTTP_GET, [](AsyncWebServerRequest* r) {
+    logEvent("LOGOUT");
     auto resp = r->beginResponse(302, "text/plain", "logged out");
     resp->addHeader("Location", "/");
     resp->addHeader("Set-Cookie", String(COOKIE_NAME) + "=deleted; Path=/; Max-Age=0");
@@ -1141,6 +1249,9 @@ void setupWebServer(void) {
       if (sUpFile) { sUpFile.close(); }
       sUploading = false;
       Serial.printf("[HTTP] audio upload ok: %s %u bytes\n", sUpPath.c_str(), (unsigned)sUpSize);
+      char upLog[ACT_EV_LEN];
+      snprintf(upLog, sizeof(upLog), "AUDIO_UPLOAD %s", sUpPath.c_str());
+      logEvent(upLog);
       r->send(200, "application/json",
               "{\"status\":\"ok\",\"name\":\"" + sUpPath.substring(String("/audio/").length()) +
               "\",\"size\":" + String((unsigned)sUpSize) + "}");
@@ -1216,6 +1327,9 @@ void setupWebServer(void) {
       return;
     }
     Serial.printf("[HTTP] ring %s\n", path);
+    char logBuf[ACT_EV_LEN];
+    snprintf(logBuf, sizeof(logBuf), "RING %s", path);
+    logEvent(logBuf);
     r->send(200, "application/json", "{\"status\":\"ok\"}");
   });
 

@@ -15,11 +15,12 @@
  *   GET  /ring[?file=name.wav] (.mp3 names auto-map to .wav) -> {status:"ok"}
  *   GET  /api/audio/list         -> {files:[{name,size}]}
  *   POST /api/audio/upload (multipart .wav <=300KB) -> {status:"ok",name,size}
+ *   GET  /api/activity?limit=N   -> {events:[{t,ev}],count} (newest first)
  *   POST /api/time/sync         -> NTP sync RTC (needs STA) -> {status:"ok",time}
  *   GET  /api/config             -> {ap_ssid,sta_ssid,sta_pass}
  *   POST /api/config (JSON)      -> {status:"ok"}
  *   GET  /test                   -> "FCU Smart Bell OK!"
- * User/activity/manual/settings views remain static/local (no firmware API).
+ * User/manual/settings views remain static/local (no firmware API).
  * ============================================================
  */
 (function () {
@@ -37,7 +38,8 @@
     test: '/test',
     audioList: '/api/audio/list',
     audioUpload: '/api/audio/upload',
-    timeSync: '/api/time/sync'
+    timeSync: '/api/time/sync',
+    activity: '/api/activity'
   };
 
   // ---------- icon fallback (no CDN: map fa-* to local glyphs) ----------
@@ -105,6 +107,7 @@
       l.classList.toggle('active', l.getAttribute('data-view') === viewId);
     });
     if (viewId === 'attendance-view') loadAttendance();
+    if (viewId === 'activity-view') loadActivity();
   }
   viewLinks.forEach(function (l) {
     l.addEventListener('click', function (e) { e.preventDefault(); showView(l.getAttribute('data-view')); });
@@ -438,6 +441,53 @@
   var refAtt = $('refresh-attendance-btn');
   if (refAtt) refAtt.addEventListener('click', loadAttendance);
 
+  // ---------- activity log (GET /api/activity, newest first) ----------
+  function activityStatus(ev) {
+    if (/FAIL|LOCKOUT|TIMEOUT|ERROR/i.test(ev)) return ['inactive', 'Needs Attention'];
+    if (/NTP_SYNC|SYSTEM_BOOT|WIFI_STA/i.test(ev)) return ['pending', 'Info'];
+    return ['active', 'Success'];
+  }
+  async function loadActivity() {
+    var body = $('activity-body'), msg = $('activity-message');
+    try {
+      var res = await fetch(API.activity + '?limit=60', { cache: 'no-store' });
+      if (res.status === 401) {
+        showLogin();
+        if (body) body.innerHTML = '<tr><td colspan="3" class="empty-state">Session expired. Please sign in.</td></tr>';
+        return;
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      var ctype = res.headers.get('content-type') || '';
+      var txt = await res.text();
+      if (ctype.indexOf('application/json') < 0 || txt.charAt(0) !== '{') {
+        throw new Error('device returned a page, not JSON — upload the latest firmware');
+      }
+      var doc = JSON.parse(txt);
+      var list = doc.events || [];
+      var cnt = $('activity-count');
+      if (cnt) cnt.textContent = String(doc.count != null ? doc.count : list.length);
+      var alerts = 0;
+      list.forEach(function (e) { if (activityStatus(e.ev || '')[0] === 'inactive') alerts++; });
+      var alEl = $('activity-alerts');
+      if (alEl) alEl.textContent = String(alerts);
+      if (!body) return;
+      if (!list.length) {
+        body.innerHTML = '<tr><td colspan="3" class="empty-state">No events yet.</td></tr>';
+        return;
+      }
+      body.innerHTML = list.map(function (e) {
+        var st = activityStatus(e.ev || '');
+        return '<tr><td><code class="mono">' + esc(e.t) + '</code></td><td>' + esc(e.ev) +
+          '</td><td><span class="status-badge ' + st[0] + '">' + st[1] + '</span></td></tr>';
+      }).join('');
+      if (msg) msg.textContent = '';
+    } catch (err) {
+      if (body) body.innerHTML = '<tr><td colspan="3" class="empty-state">Error: ' + esc(err.message) + '</td></tr>';
+    }
+  }
+  var refAct = $('refresh-activity-btn');
+  if (refAct) refAct.addEventListener('click', loadActivity);
+
   // ---------- network config (GET/POST /api/config JSON) ----------
   async function loadConfig() {
     var apEl = $('net-ap'), ssEl = $('net-ssid'), pwEl = $('net-pass');
@@ -664,5 +714,7 @@
   setInterval(function () {
     var v = $('attendance-view');
     if (v && v.classList.contains('active')) loadAttendance();
+    var a = $('activity-view');
+    if (a && a.classList.contains('active')) loadActivity();
   }, 10000);
 })();
