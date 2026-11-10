@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>FCU Alarm Clock</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, Helvetica, sans-serif; }
+  body { background: #eef3fa; color: #1e293b; padding-bottom: 20px; }
+
+  /* ---------- Login ---------- */
+  .login-page { background: #0b2c75; display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
+  .login-card { width: 100%; max-width: 400px; background: #fff; border-radius: 16px; padding: 32px 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.25); }
+  .login-card h1 { text-align: center; color: #0b2c75; font-size: 28px; margin-bottom: 8px; }
+  .login-card p { text-align: center; color: #64748b; font-size: 14px; margin-bottom: 24px; }
+  .input-group { margin-bottom: 16px; }
+  .input-group label { display: block; font-size: 13px; color: #475569; margin-bottom: 6px; }
+  .input-group input { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 16px; }
+  .login-btn { width: 100%; background: #0b3b8f; color: #fff; border: none; padding: 14px; border-radius: 8px; font-size: 17px; font-weight: bold; cursor: pointer; }
+  .login-btn:hover { background: #072d6f; }
+  .msg { margin-top: 12px; font-size: 13px; text-align: center; }
+  .msg.error { color: #dc2626; }
+  .msg.success { color: #16a34a; }
+
+  /* ---------- App Shell ---------- */
+  .app-shell { display: none; max-width: 1200px; margin: 0 auto; padding: 16px; }
+  .app-shell.active { display: block; }
+  .app-shell header { background: #fff; border-radius: 12px; padding: 16px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+  .app-shell h2 { font-size: 20px; font-weight: 700; color: #0b2c75; }
+  .user-chip { font-size: 13px; color: #64748b; background: #f1f5f9; padding: 6px 14px; border-radius: 20px; }
+
+  /* grid */
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+  .full { grid-column: 1 / -1; }
+
+  /* cards */
+  .card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 16px; }
+  .card h3 { font-size: 14px; color: #64748b; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; display: flex; justify-content: space-between; align-items: center; }
+
+  /* clock */
+  .clock-card { background: linear-gradient(135deg, #0b2c75, #0b3b8f); color: #fff; border-radius: 16px; padding: 24px; text-align: center; }
+  .clock-card .big-time { font-size: 56px; font-weight: 800; letter-spacing: -2px; }
+  .clock-card .big-date { font-size: 16px; opacity: 0.9; margin-top: 6px; }
+  .clock-card .next-alarm { font-size: 18px; font-weight: 700; margin-top: 10px; }
+
+  /* alarm list */
+  .alarm-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
+  .alarm-item:last-child { border-bottom: none; }
+  .alarm-info { flex: 1; }
+  .alarm-time { font-size: 22px; font-weight: 700; }
+  .alarm-label { font-size: 13px; color: #475569; margin-top: 2px; }
+  .alarm-days { font-size: 10px; color: #94a3b8; margin-top: 4px; letter-spacing: 1px; }
+  .alarm-days .on { color: #0b3b8f; font-weight: 700; }
+  .toggle { position: relative; width: 44px; height: 24px; background: #cbd5e1; border-radius: 12px; cursor: pointer; }
+  .toggle.on { background: #0b3b8f; }
+  .toggle knob { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background: #fff; border-radius: 50%; transition: left 0.2s; }
+  .toggle.on knob { left: 22px; }
+
+  /* add alarm quick bar */
+  .add-bar { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; align-items: center; }
+  .add-bar select { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; min-width: 70px; }
+  .add-bar input[type="text"] { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; flex: 1; min-width: 120px; }
+
+  /* days grid */
+  .days-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; margin-bottom: 10px; }
+  .day-btn { aspect-ratio: 1; border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; font-size: 11px; font-weight: 700; cursor: pointer; color: #94a3b8; }
+  .day-btn.selected { background: #0b3b8f; color: #fff; border-color: #0b3b8f; }
+
+  /* lists */
+  .list-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+  .list-item:last-child { border-bottom: none; }
+  .empty { text-align: center; color: #94a3b8; padding: 24px 16px; font-size: 13px; }
+
+  /* badges */
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; }
+  .badge.admin { background: #dbeafe; color: #1d4ed8; }
+  .badge.staff { background: #fef3c7; color: #92400e; }
+  .badge.active { background: #dcfce7; color: #166534; }
+
+  .audit-row { font-family: monospace; font-size: 10px; padding: 4px 0; border-bottom: 1px solid #f1f5f9; color: #475569; }
+
+  /* buttons */
+  .btn { padding: 10px 16px; border-radius: 8px; border: none; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .btn.primary { background: #0b3b8f; color: #fff; }
+  .btn.secondary { background: #f1f5f9; color: #334155; }
+  .btn.danger { background: #dc2626; color: #fff; }
+  .btn.sm { padding: 6px 12px; font-size: 12px; }
+
+  /* stat cards */
+  .stat { display: flex; flex-direction: column; gap: 4px; }
+  .stat .v { font-size: 18px; font-weight: 700; }
+  .stat .k { font-size: 11px; color: #64748b; }
+
+  /* audio upload */
+  .upload-bar { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .upload-bar input[type="file"] { flex: 1; padding: 8px; border: 1px dashed #cbd5e1; border-radius: 8px; background: #fff; }
+
+  /* wifi config */
+  .wifi-row { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+  .wifi-row input { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; }
+  .wifi-row input[type="text"] { flex: 1; min-width: 140px; }
+  .wifi-row input[type="password"] { flex: 1; min-width: 140px; }
+
+  /* modal */
+  .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; padding: 20px; }
+  .modal.open { display: flex; }
+  .modal-card { background: #fff; border-radius: 16px; width: 100%; max-width: 420px; max-height: 90vh; overflow-y: auto; padding: 24px; }
+  .modal-card h3 { font-size: 17px; margin-bottom: 16px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .audio-select { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; background: #fff; }
+  .btn-row { display: flex; gap: 10px; margin-top: 16px; }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #1e293b; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px; z-index: 200; display: none; }
+
+  @media (max-width: 768px) {
+    .grid { grid-template-columns: 1fr; }
+    .app-shell { padding: 10px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div class="login-page" id="login-page">
+  <div class="login-card">
+    <h1>FCU Alarm</h1>
+    <p>Sign in to manage alarms</p>
+    <form id="login-form">
+      <div class="input-group"><label>Username</label><input type="text" id="login-user" required /></div>
+      <div class="input-group"><label>Password</label><input type="password" id="login-pass" required /></div>
+      <button type="submit" class="login-btn">Sign In</button>
+    </form>
+    <div id="login-msg" class="msg"></div>
+  </div>
+</div>
+
+<!-- ================= DASHBOARD (ALL SECTIONS AT ONCE) ================= -->
+<div class="app-shell" id="app-shell">
+  <header>
+    <h2>FCU Alarm Clock</h2>
+    <div id="shell-user" class="user-chip">Guest</div>
+    <button class="btn secondary" onclick="doLogout()">Sign Out</button>
+  </header>
+
+  <!-- Clock + Next Alarm -->
+  <div class="card clock-card full">
+    <h3 style="color:#fff;margin-bottom:12px;">Current Time</h3>
+    <div class="big-time" id="clock-time">--:--</div>
+    <div class="big-date" id="clock-date">--</div>
+    <div class="next-alarm" id="next-alarm">No alarm set</div>
+  </div>
+
+  <!-- Alarms -->
+  <div class="card">
+    <h3>Alarms <button class="btn primary sm" onclick="openAddModal()">+ Add</button></h3>
+    <div class="add-bar">
+      <select id="quick-hour"></select>
+      <select id="quick-minute"></select>
+      <select id="quick-period"><option value="AM">AM</option><option value="PM">PM</option></select>
+      <input type="text" id="quick-label" placeholder="Label" />
+      <select id="quick-audio"></select>
+      <button class="btn primary sm" onclick="quickAddAlarm()">Add</button>
+    </div>
+    <div id="alarm-list"></div>
+  </div>
+
+  <!-- WiFi Network -->
+  <div class="card full" id="wifi-card" style="display:none;">
+    <h3>WiFi Network (NTP Sync)</h3>
+    <div class="wifi-row">
+      <input type="text" id="wifi-ssid" placeholder="SSID" />
+      <input type="password" id="wifi-pass" placeholder="Password" />
+      <button class="btn primary sm" onclick="saveWifi()">Save</button>
+      <button class="btn secondary sm" onclick="connectWifi()">Connect</button>
+    </div>
+    <div id="wifi-status" style="font-size:12px;color:#64748b;margin-top:6px;"></div>
+  </div>
+
+  <!-- System Status -->
+  <div class="card">
+    <h3>System Status</h3>
+    <div class="grid" style="margin-top:8px;">
+      <div class="stat"><span class="k">Firmware</span><span class="v" id="fw-ver">--</span></div>
+      <div class="stat"><span class="k">RTC</span><span class="v" id="sys-rtc">--</span></div>
+      <div class="stat"><span class="k">SD Card</span><span class="v" id="sys-sd">--</span></div>
+      <div class="stat"><span class="k">Alarms</span><span class="v" id="sys-alarms">0</span></div>
+      <div class="stat"><span class="k">WiFi</span><span class="v" id="sys-wifi">--</span></div>
+      <div class="stat"><span class="k">Uptime</span><span class="v" id="sys-uptime">--</span></div>
+    </div>
+    <div style="margin-top:8px;">
+      <button class="btn secondary sm" onclick="loadTelemetry()">Refresh</button>
+      <button class="btn secondary sm" onclick="remountSd()">Remount SD</button>
+    </div>
+  </div>
+
+  <!-- Audio Files -->
+  <div class="card full">
+    <h3>Audio Files <button class="btn secondary sm" onclick="loadAudioFiles()">Refresh</button></h3>
+    <div id="audio-list"></div>
+  </div>
+
+  <!-- Users (Admin) -->
+  <div class="card full" id="users-card" style="display:none;">
+    <h3>Users (Admin) <button class="btn secondary sm" onclick="loadUsers()">Refresh</button></h3>
+    <div class="add-bar" style="margin-bottom:10px;">
+      <input type="text" id="new-user-name" placeholder="Name" />
+      <input type="password" id="new-user-pass" placeholder="Password" />
+      <select id="new-user-role"><option value="Staff">Staff</option><option value="Admin">Admin</option></select>
+      <select id="new-user-status"><option value="Active">Active</option><option value="Disabled">Disabled</option></select>
+      <button class="btn primary sm" onclick="addUser()">Add</button>
+    </div>
+    <div id="user-list"></div>
+  </div>
+
+  <!-- Audit Log -->
+  <div class="card full">
+    <h3>Audit Log (AAA)</h3>
+    <div id="audit-list" style="max-height: 300px; overflow-y: auto;"></div>
+    <button class="btn secondary sm" style="margin-top:8px;" onclick="loadAudit()">Refresh</button>
+  </div>
+</div>
+
+<!-- ================= ADD / EDIT ALARM MODAL ================= -->
+<div class="modal" id="alarm-modal">
+  <div class="modal-card">
+    <h3 id="modal-title">Add Alarm</h3>
+    <input type="hidden" id="edit-alarm-id" />
+    <div class="row">
+      <select id="edit-hour"></select>
+      <select id="edit-minute"></select>
+      <select id="edit-period"><option value="AM">AM</option><option value="PM">PM</option></select>
+      <label style="display:flex;align-items:center;gap:6px;justify-content:flex-end;font-size:13px;color:#64748b;">
+        <input type="checkbox" id="edit-enabled" checked /> Enabled
+      </label>
+    </div>
+    <div class="row">
+      <input type="text" id="edit-label" placeholder="Label (e.g. Morning Bell)" />
+    </div>
+    <div class="days-grid" id="edit-days"></div>
+    <label style="font-size:12px;color:#64748b;margin-bottom:6px;display:block;">Audio</label>
+    <select id="edit-audio" class="audio-select"></select>
+    <div class="btn-row">
+      <button class="btn secondary" onclick="closeModal()">Cancel</button>
+      <button class="btn primary" id="modal-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ---------- config ---------- */
+const API = "";
+let token = "";
+let role = "";
+const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+/* ---------- elements ---------- */
+const el = {
+  loginPage: document.getElementById("login-page"),
+  appShell: document.getElementById("app-shell"),
+  loginMsg: document.getElementById("login-msg"),
+  clockTime: document.getElementById("clock-time"),
+  clockDate: document.getElementById("clock-date"),
+  nextAlarm: document.getElementById("next-alarm"),
+  alarmList: document.getElementById("alarm-list"),
+  audioList: document.getElementById("audio-list"),
+  userList: document.getElementById("user-list"),
+  auditList: document.getElementById("audit-list"),
+  shellUser: document.getElementById("shell-user"),
+  fwVer: document.getElementById("fw-ver"),
+  sysRtc: document.getElementById("sys-rtc"),
+  sysSd: document.getElementById("sys-sd"),
+  sysAlarms: document.getElementById("sys-alarms"),
+  sysWifi: document.getElementById("sys-wifi"),
+  sysUptime: document.getElementById("sys-uptime"),
+  quickHour: document.getElementById("quick-hour"),
+  quickMinute: document.getElementById("quick-minute"),
+  quickPeriod: document.getElementById("quick-period"),
+  quickLabel: document.getElementById("quick-label"),
+  quickAudio: document.getElementById("quick-audio"),
+  wifiCard: document.getElementById("wifi-card"),
+  wifiSsid: document.getElementById("wifi-ssid"),
+  wifiPass: document.getElementById("wifi-pass"),
+  wifiStatus: document.getElementById("wifi-status"),
+  toast: document.getElementById("toast"),
+  modal: document.getElementById("alarm-modal"),
+  modalTitle: document.getElementById("modal-title"),
+  editId: document.getElementById("edit-alarm-id"),
+  editHour: document.getElementById("edit-hour"),
+  editMinute: document.getElementById("edit-minute"),
+  editPeriod: document.getElementById("edit-period"),
+  editEnabled: document.getElementById("edit-enabled"),
+  editLabel: document.getElementById("edit-label"),
+  editDays: document.getElementById("edit-days"),
+  editAudio: document.getElementById("edit-audio"),
+  modalSave: document.getElementById("modal-save"),
+  newUserName: document.getElementById("new-user-name"),
+  newUserPass: document.getElementById("new-user-pass"),
+};
+
+/* ---------- helpers ---------- */
+function toast(msg, err){
+  el.toast.textContent = msg;
+  el.toast.className = "toast" + (err?" error":"");
+  el.toast.style.display = "block";
+  setTimeout(()=> el.toast.style.display="none", 2500);
+}
+
+async function api(path, method, body){
+  const opts = { method, headers: {} };
+  if (token) opts.headers["Cookie"] = "session=" + token;
+  if (body) opts.headers["Content-Type"] = "application/json";
+  opts.body = body ? JSON.stringify(body) : undefined;
+  const r = await fetch(API + path, opts);
+  if (r.status === 401 || r.status === 403){
+    token = ""; role = "";
+    toast("Session expired. Sign in again.", true);
+    el.appShell.style.display = "none";
+    el.loginPage.style.display = "flex";
+  }
+  return r;
+}
+
+function escapeHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function pad(n){ return String(n).padStart(2,"0"); }
+
+// 12h <-> 24h conversion
+function to24Hour(h12, period){
+  let h = parseInt(h12, 10);
+  if (period === "AM" && h === 12) h = 0;
+  if (period === "PM" && h !== 12) h += 12;
+  return h;
+}
+function from24Hour(h24){
+  let h = h24 % 12;
+  if (h === 0) h = 12;
+  return h;
+}
+function periodOf(h24){
+  return h24 < 12 ? "AM" : "PM";
+}
+
+function populateHourSelect(sel){
+  sel.innerHTML = "";
+  for (let h=1; h<=12; h++) sel.add(new Option(pad(h), h));
+}
+function populateMinuteSelect(sel){
+  sel.innerHTML = "";
+  for (let m=0; m<60; m++) sel.add(new Option(pad(m), m));
+}
+
+/* ---------- auth ---------- */
+document.getElementById("login-form").addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  const u = document.getElementById("login-user").value;
+  const p = document.getElementById("login-pass").value;
+  try {
+    const r = await fetch(API + "/api/login", {
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({username:u, password:p})
+    });
+    if (!r.ok){ el.loginMsg.textContent = "Login failed"; el.loginMsg.className = "msg error"; return; }
+    const ct = r.headers.get("set-cookie") || "";
+    const m = ct.match(/session=([^;]+)/);
+    if (m) token = m[1];
+    const d = await r.json();
+    role = d.role || "Staff";
+    el.loginMsg.textContent = "";
+    el.appShell.style.display = "block";
+    el.loginPage.style.display = "none";
+    el.shellUser.textContent = u + " (" + role + ")";
+    // Admin-only sections
+    const isAdmin = role === "Admin";
+    document.getElementById("users-card").style.display = isAdmin ? "block" : "none";
+    document.getElementById("wifi-card").style.display = isAdmin ? "block" : "none";
+    initDays();
+    loadAudioOptions();
+    loadAll();
+    startClock();
+  } catch(err){ el.loginMsg.textContent = "Error"; el.loginMsg.className = "msg error"; }
+});
+
+async function doLogout(){
+  try { await api("/api/logout","POST"); } catch(e){}
+  token = ""; role = "";
+  location.reload();
+}
+
+/* ---------- load everything ---------- */
+function loadAll(){
+  loadAlarms();
+  loadAudioFiles();
+  loadUsers();
+  loadAudit();
+  loadTelemetry();
+  loadWifi();
+}
+
+function startClock(){
+  setInterval(async ()=>{
+    try {
+      const r = await api("/api/telemetry","GET");
+      if (r.ok){
+        const d = await r.json();
+        const now = new Date(d.time);
+        el.clockTime.textContent = pad(from24Hour(now.getHours()))+":"+pad(now.getMinutes())+" "+periodOf(now.getHours());
+        el.clockDate.textContent = now.toLocaleDateString([], {weekday:"long",year:"numeric",month:"long",day:"numeric"});
+        el.sysRtc.textContent = d.rtc ? "OK" : "Fallback";
+        el.sysSd.textContent = d.sd_ok ? "OK" : "ERROR";
+        el.sysSd.style.color = d.sd_ok ? "#16a34a" : "#dc2626";
+        el.sysAlarms.textContent = d.alarms;
+        el.fwVer.textContent = d.version || "3.0.0";
+        el.sysUptime.textContent = Math.floor(d.uptime/3600)+"h "+Math.floor((d.uptime%3600)/60)+"m";
+        el.sysWifi.textContent = d.wifi_connected ? "Connected" : "AP Only";
+        el.sysWifi.style.color = d.wifi_connected ? "#16a34a" : "#94a3b8";
+      }
+    } catch(e){}
+  }, 1000);
+}
+
+async function remountSd(){
+  try {
+    const r = await api("/api/sd/remount","POST");
+    if (r.ok){ toast("SD remounted"); loadTelemetry(); loadAudioFiles(); loadUsers(); loadAudit(); }
+    else toast("SD remount failed", true);
+  } catch(e){ toast("Error", true); }
+}
+
+/* ---------- alarms ---------- */
+async function loadAlarms(){
+  try {
+    const r = await api("/api/alarms","GET");
+    if (!r.ok) { el.alarmList.innerHTML = '<div class="empty">Failed to load alarms.</div>'; return; }
+    const arr = await r.json();
+    renderAlarms(arr);
+    updateNextAlarm(arr);
+  } catch(e){ toast("Failed to load alarms", true); }
+}
+
+function renderAlarms(arr){
+  el.alarmList.innerHTML = "";
+  if (!arr || arr.length === 0){
+    el.alarmList.innerHTML = '<div class="empty">No alarms yet. Tap + Add to create one.</div>';
+    return;
+  }
+  arr.forEach(a=>{
+    const daysHtml = DAYS.map((d,i)=>{
+      const on = !!(a.days & (1<<i));
+      return '<div class="day-btn '+(on?"selected":"")+'" data-day="'+i+'">'+d+'</div>';
+    }).join("");
+    const item = document.createElement("div");
+    item.className = "alarm-item";
+    item.innerHTML =
+      '<div class="alarm-info">'+
+      '<div class="alarm-time">'+pad(from24Hour(a.hour))+':'+pad(a.minute)+' '+periodOf(a.hour)+'</div>'+
+      '<div class="alarm-label">'+escapeHtml(a.label||"Alarm")+'</div>'+
+      '<div class="alarm-days">'+daysHtml+'</div>'+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:8px;">'+
+      '<div class="toggle '+(a.enabled?"on":"")+'" data-id="'+a.id+'" data-enabled="'+(!a.enabled?1:0)+'" onclick="toggleAlarmFromElement(this)"><knob></knob></div>'+
+      '<button class="btn secondary sm" data-id="'+a.id+'" onclick="editAlarmFromElement(this)">Edit</button>'+
+      '<button class="btn danger sm" data-id="'+a.id+'" onclick="deleteAlarmFromElement(this)">Del</button>'+
+      '</div>';
+    el.alarmList.appendChild(item);
+  });
+}
+
+function updateNextAlarm(arr){
+  const now = new Date();
+  let next = null;
+  for (const a of arr){
+    if (!a.enabled) continue;
+    for (let i=0;i<7;i++){
+      if (!(a.days & (1<<i))) continue;
+      const d = new Date(now);
+      d.setDate(d.getDate() + ((i - d.getDay() + 7) % 7 || 7));
+      d.setHours(a.hour, a.minute, 0, 0);
+      if (d <= now) d.setDate(d.getDate()+7);
+      if (!next || d < next) next = d;
+    }
+  }
+  el.nextAlarm.textContent = next ? "Next: " + pad(from24Hour(next.getHours()))+":"+pad(next.getMinutes())+" "+periodOf(next.getHours()) : "No alarm set";
+}
+
+function toggleAlarmFromElement(elBtn){
+  const id = parseInt(elBtn.getAttribute("data-id"));
+  const enabled = elBtn.getAttribute("data-enabled") === "1";
+  toggleAlarm(id, !enabled);
+}
+
+function editAlarmFromElement(elBtn){
+  const id = parseInt(elBtn.getAttribute("data-id"));
+  openEditModal(id);
+}
+
+function deleteAlarmFromElement(elBtn){
+  const id = parseInt(elBtn.getAttribute("data-id"));
+  deleteAlarm(id);
+}
+
+async function toggleAlarm(id, enabled){
+  try {
+    const r = await api("/api/alarms","PUT",{id:id, enabled:enabled});
+    if (r.ok){ loadAlarms(); loadTelemetry(); toast("Alarm "+(enabled?"enabled":"disabled")); }
+    else toast("Failed to toggle alarm", true);
+  } catch(e){ toast("Error", true); }
+}
+
+async function quickAddAlarm(){
+  const hh = parseInt(el.quickHour.value, 10);
+  const mm = parseInt(el.quickMinute.value, 10);
+  const period = el.quickPeriod.value;
+  const hour24 = to24Hour(hh, period);
+  if (isNaN(hh) || isNaN(mm)){ toast("Pick a time", true); return; }
+  const days = Array.from(el.editDays.children).reduce((m,cb,i)=> cb.classList.contains("selected")? m|(1<<i):m, 0);
+  const body = {
+    id: 0, label: el.quickLabel.value || "Alarm",
+    hour: hour24, minute: mm, enabled: true, days: days,
+    audio: el.quickAudio.value || "/audio/chime.mp3"
+  };
+  try {
+    const r = await api("/api/alarms","POST",body);
+    if (!r.ok){ toast("Add failed", true); return; }
+    el.quickLabel.value = "";
+    loadAlarms(); loadTelemetry(); toast("Alarm added");
+  } catch(e){ toast("Error", true); }
+}
+
+async function deleteAlarm(id){
+  if (!confirm("Delete this alarm?")) return;
+  try {
+    const r = await api("/api/alarms?id="+id,"DELETE");
+    if (r.ok){ loadAlarms(); loadTelemetry(); toast("Alarm deleted"); }
+    else toast("Failed to delete", true);
+  } catch(e){ toast("Error", true); }
+}
+
+function openEditModal(id){
+  api("/api/alarms","GET").then(async r => {
+    if (!r.ok) return;
+    const arr = await r.json();
+    const a = arr.find(x => x.id === id);
+    if (!a) return;
+    el.modalTitle.textContent = "Edit Alarm";
+    el.editId.value = a.id;
+    el.editHour.value = from24Hour(a.hour);
+    el.editMinute.value = pad(a.minute);
+    el.editPeriod.value = periodOf(a.hour);
+    el.editEnabled.checked = a.enabled;
+    el.editLabel.value = a.label || "";
+    Array.from(el.editDays.children).forEach((cb,i)=>{
+      cb.classList.toggle("selected", !!(a.days & (1<<i)));
+    });
+    el.editAudio.value = a.audio || "/audio/chime.mp3";
+    el.modal.classList.add("open");
+  });
+}
+
+function openAddModal(){
+  el.modalTitle.textContent = "Add Alarm";
+  el.editId.value = "";
+  const now = new Date();
+  el.editHour.value = from24Hour(now.getHours());
+  el.editMinute.value = pad(now.getMinutes());
+  el.editPeriod.value = periodOf(now.getHours());
+  el.editEnabled.checked = true;
+  el.editLabel.value = "";
+  Array.from(el.editDays.children).forEach(cb=> cb.classList.remove("selected"));
+  el.editAudio.value = "/audio/chime.mp3";
+  el.modal.classList.add("open");
+}
+
+function closeModal(){ el.modal.classList.remove("open"); }
+
+el.modalSave.addEventListener("click", async ()=>{
+  const id = el.editId.value;
+  const hh = parseInt(el.editHour.value, 10);
+  const mm = parseInt(el.editMinute.value, 10);
+  const period = el.editPeriod.value;
+  const hour24 = to24Hour(hh, period);
+  const days = Array.from(el.editDays.children).reduce((m,cb,i)=> cb.classList.contains("selected")? m|(1<<i):m, 0);
+  const body = {
+    id: id ? parseInt(id) : 0,
+    label: el.editLabel.value || "Alarm",
+    hour: hour24, minute: mm,
+    enabled: el.editEnabled.checked,
+    days: days,
+    audio: el.editAudio.value
+  };
+  try {
+    const r = await api("/api/alarms", id?"PUT":"POST", body);
+    if (!r.ok){ toast("Save failed", true); return; }
+    closeModal();
+    loadAlarms();
+    loadTelemetry();
+    toast(id?"Alarm updated":"Alarm added");
+  } catch(e){ toast("Error", true); }
+});
+
+function initDays(){
+  el.editDays.innerHTML = DAYS.map((d,i)=>'<div class="day-btn" data-day="'+i+'">'+d+'</div>').join("");
+  el.editDays.addEventListener("click", (e)=>{
+    if (e.target.classList.contains("day-btn")) e.target.classList.toggle("selected");
+  });
+  populateHourSelect(el.editHour);
+  populateMinuteSelect(el.editMinute);
+  populateHourSelect(el.quickHour);
+  populateMinuteSelect(el.quickMinute);
+}
+
+/* ---------- audio ---------- */
+async function loadAudioFiles(){
+  try {
+    const r = await api("/api/audio-files","GET");
+    if (!r.ok) { el.audioList.innerHTML = '<div class="empty">Failed to load audio.</div>'; return; }
+    const d = await r.json();
+    const files = d.files || [];
+    el.audioList.innerHTML = "";
+    if (files.length===0){ el.audioList.innerHTML = '<div class="empty">No audio files.</div>'; }
+    files.forEach(f=>{
+      const item = document.createElement("div");
+      item.className = "list-item";
+      item.innerHTML = '<span>'+escapeHtml(f)+'</span>';
+      el.audioList.appendChild(item);
+    });
+  } catch(e){ toast("Audio load failed", true); }
+}
+
+async function loadAudioOptions(){
+  try {
+    const r = await api("/api/audio-files","GET");
+    if (!r.ok) return;
+    const d = await r.json();
+    const files = d.files || [];
+    const sel = el.editAudio;
+    const qsel = el.quickAudio;
+    sel.innerHTML = files.map(f=>'<option value="'+escapeHtml(f)+'">'+escapeHtml(f)+'</option>').join("");
+    qsel.innerHTML = files.map(f=>'<option value="'+escapeHtml(f)+'">'+escapeHtml(f)+'</option>').join("");
+    if (!sel.value) sel.value = "/audio/chime.mp3";
+    if (!qsel.value) qsel.value = "/audio/chime.mp3";
+  } catch(e){}
+}
+
+/* ---------- users ---------- */
+async function loadUsers(){
+  try {
+    const r = await api("/api/users","GET");
+    if (!r.ok) { el.userList.innerHTML = '<div class="empty">Failed to load users.</div>'; return; }
+    const d = await r.json();
+    const users = d.users || [];
+    el.userList.innerHTML = "";
+    users.forEach(u=>{
+      const item = document.createElement("div");
+      item.className = "list-item";
+      const isActive = u.status === "Active";
+      item.innerHTML =
+        '<div><div style="font-weight:700;">'+escapeHtml(u.name)+'</div><div style="font-size:12px;color:#64748b;">'+escapeHtml(u.role)+' • '+escapeHtml(u.status)+'</div></div>'+
+        '<div style="display:flex;align-items:center;gap:8px;">'+
+        (!isActive?'<button class="btn secondary sm" data-name="'+escapeHtml(u.name)+'" onclick="setUserStatusFromElement(this,\'Active\')">Enable</button>':'' )+
+        (isActive?'<button class="btn secondary sm" data-name="'+escapeHtml(u.name)+'" onclick="setUserStatusFromElement(this,\'Disabled\')">Disable</button>':'' )+
+        (u.name!=="admin"?('<button class="btn danger sm" data-name="'+escapeHtml(u.name)+'" onclick="deleteUserFromElement(this)">Del</button>'):'' )+
+        '</div>';
+      el.userList.appendChild(item);
+    });
+  } catch(e){ toast("Users load failed", true); }
+}
+
+function setUserStatusFromElement(elBtn, status){
+  const name = elBtn.getAttribute("data-name");
+  setUserStatus(name, status);
+}
+
+function deleteUserFromElement(elBtn){
+  const name = elBtn.getAttribute("data-name");
+  deleteUser(name);
+}
+
+async function addUser(){
+  const name = document.getElementById("new-user-name").value;
+  const pass = document.getElementById("new-user-pass").value;
+  const userRole = document.getElementById("new-user-role").value;
+  const status = document.getElementById("new-user-status").value;
+  if (!name){ toast("Name required", true); return; }
+  if (!pass){ toast("Password required", true); return; }
+  try {
+    const r = await api("/api/users","POST",{name,password:pass,role:userRole,status,lastLogin:"Just now"});
+    if (r.ok){ document.getElementById("new-user-name").value=""; document.getElementById("new-user-pass").value=""; loadUsers(); toast("User added"); }
+    else toast("Add failed", true);
+  } catch(e){ toast("Error", true); }
+}
+
+async function setUserStatus(name, status){
+  try {
+    const r = await api("/api/users","POST",{name,role:"Staff",status,lastLogin:"Just now"});
+    if (r.ok) { loadUsers(); toast("User updated"); }
+    else toast("Failed", true);
+  } catch(e){ toast("Error", true); }
+}
+
+async function deleteUser(name){
+  if (name==="admin"){ toast("Cannot delete admin", true); return; }
+  if (!confirm("Delete "+name+"?")) return;
+  try {
+    const r = await api("/api/users?name="+encodeURIComponent(name),"DELETE");
+    if (r.ok) { loadUsers(); toast("User deleted"); }
+    else toast("Failed", true);
+  } catch(e){ toast("Error", true); }
+}
+
+/* ---------- wifi ---------- */
+async function loadWifi(){
+  try {
+    const r = await api("/api/wifi","GET");
+    if (!r.ok) return;
+    const d = await r.json();
+    el.wifiSsid.value = d.ssid || "";
+    el.wifiStatus.textContent = d.connected ? "Connected to "+d.ssid+" ("+d.ip+")" : "Not connected";
+    el.wifiStatus.style.color = d.connected ? "#16a34a" : "#94a3b8";
+  } catch(e){}
+}
+
+async function saveWifi(){
+  const ssid = el.wifiSsid.value;
+  const pass = el.wifiPass.value;
+  if (!ssid){ toast("SSID required", true); return; }
+  try {
+    const r = await api("/api/wifi","POST",{ssid, pass});
+    if (!r.ok){ toast("Save failed", true); return; }
+    toast("WiFi config saved");
+    loadWifi();
+  } catch(e){ toast("Error", true); }
+}
+
+async function connectWifi(){
+  try {
+    const r = await api("/api/wifi/connect","POST");
+    if (!r.ok){ toast("Connect failed", true); return; }
+    toast("Connecting to WiFi...");
+    setTimeout(loadWifi, 5000);
+  } catch(e){ toast("Error", true); }
+}
+
+/* ---------- audit ---------- */
+async function loadAudit(){
+  try {
+    const r = await api("/api/audit-logs","GET");
+    if (!r.ok) { el.auditList.innerHTML = '<div class="empty">Failed to load audit log.</div>'; return; }
+    const text = await r.text();
+    const lines = text.trim().split("\n").filter(Boolean);
+    el.auditList.innerHTML = "";
+    lines.slice().reverse().forEach(line=>{
+      const parts = line.split(",");
+      const div = document.createElement("div");
+      div.className = "audit-row";
+      div.textContent = (parts[0]?new Date(parseInt(parts[0])).toLocaleString():"")+" | "+
+        (parts[1]||"-")+" | "+(parts[2]||"-")+" | "+(parts[3]||"-")+" | "+(parts[4]||"-")+" | "+(parts[5]||"-");
+      el.auditList.appendChild(div);
+    });
+    el.auditList.scrollTop = el.auditList.scrollHeight;
+  } catch(e){ toast("Audit load failed", true); }
+}
+
+/* ---------- settings ---------- */
+async function loadTelemetry(){
+  try {
+    const r = await api("/api/telemetry","GET");
+    if (r.ok){
+      const d = await r.json();
+      el.sysRtc.textContent = d.rtc ? "OK" : "Fallback";
+      el.sysSd.textContent = d.sd_ok ? "OK" : "ERROR";
+      el.sysSd.style.color = d.sd_ok ? "#16a34a" : "#dc2626";
+      el.sysAlarms.textContent = d.alarms;
+      el.fwVer.textContent = d.version || "3.0.0";
+      el.sysUptime.textContent = Math.floor(d.uptime/3600)+"h "+Math.floor((d.uptime%3600)/60)+"m";
+      el.sysWifi.textContent = d.wifi_connected ? "Connected" : "AP Only";
+      el.sysWifi.style.color = d.wifi_connected ? "#16a34a" : "#94a3b8";
+    }
+  } catch(e){}
+}
+
+// close modal on backdrop click
+document.getElementById("alarm-modal").addEventListener("click", (e)=>{
+  if (e.target.id === "alarm-modal") closeModal();
+});
+</script>
+
+</body>
+</html>
