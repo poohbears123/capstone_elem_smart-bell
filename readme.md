@@ -172,25 +172,3 @@ To compile the firmware successfully using PlatformIO or Arduino IDE, install th
 * **RTC Hardware Driver:** `RTClib` (Adafruit DS3231 library)
 * **Audio Engine:** `schreibfaul1/ESP32-audioI2S` (`Audio.h`)
 * **Cryptographic Support:** `mbedtls/md5.h`
-
----
-
-## Installation & Setup
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/your-org/capstone_elem_alarm-clock.git
-   cd capstone_elem_alarm-clock
-   ```
-
-2. **Prepare the Storage:**
-   Format a MicroSD card to **FAT32** and copy the required directory tree from the `sd_card_template/` folder.
-
-3. **Build Web Assets (Optional):**
-   If modifying `ui/index.html`, regenerate the embedded header using the provided PowerShell utility:
-   ```powershell
-   .\scripts\generate_ui_embed.ps1
-   ```
-
-4. **Flash to Target Hardware:**
-   Compile and flash to your ESP32-S3 target using PlatformIO or the Arduino IDE with partition scheme configured for `Default 4MB with spiffs` or larger.
